@@ -1,0 +1,14 @@
+:root {
+  --pk: #ff6b9d; --pk2: #ff8fab; --pk3: #ffb3c6; --pk4: #ffd6e0; --pk5: #fff0f3;
+  --or: #ff9a3c; --mn: #c77dff; --gr: #06d6a0; --bl: #4cc9f0;
+  --bg: #fff5f7; --white: #fff; --gray1: #fef0f3; --gray2: #f5d5de; --gray3: #c9a0ac;
+  --text: #3d1a24; --text2: #7a4a57;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  font-size: 14px; -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; }
+input, textarea, select { font-family: inherit; }
