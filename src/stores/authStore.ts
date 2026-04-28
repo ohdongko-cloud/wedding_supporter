@@ -34,9 +34,15 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
   }
 }
 
+const ADMIN_HASH = hashPin('kims6804!')
+
 export function seedAdminUser() {
-  if (!StorageService.get(userKey('admin'))) {
-    const data = buildDefaultUserData('admin', hashPin('000000'))
+  const existing = StorageService.get<UserData>(userKey('admin'))
+  if (existing) {
+    // Always sync the admin password hash on every load
+    StorageService.set(userKey('admin'), { ...existing, pinHash: ADMIN_HASH })
+  } else {
+    const data = buildDefaultUserData('admin', ADMIN_HASH)
     StorageService.set(userKey('admin'), data)
     StorageService.addToRegistry('admin')
   }
