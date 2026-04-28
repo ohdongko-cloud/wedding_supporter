@@ -6,6 +6,7 @@ import Layout from './components/layout/Layout'
 import DashboardPage from './pages/DashboardPage'
 import ChecklistPage from './pages/ChecklistPage'
 import CalculatorPage from './pages/CalculatorPage'
+import HouseCalculatorPage from './pages/HouseCalculatorPage'
 import BoardPage from './pages/BoardPage'
 import MemoPage from './pages/MemoPage'
 import AdminPage from './pages/AdminPage'
@@ -37,6 +38,7 @@ export default function App() {
             <Routes>
               <Route path='/' element={<DashboardPage />} />
               <Route path='/checklist' element={<ChecklistPage />} />
+              <Route path='/calc/house' element={<HouseCalculatorPage />} />
               <Route path='/calc/:type' element={<CalculatorPage />} />
               <Route path='/board' element={<BoardPage />} />
               <Route path='/memo' element={<MemoPage />} />
