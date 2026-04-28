@@ -1,26 +1,43 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { CALC_CAT_LABELS, CALC_SEEDS } from '../data/calculatorSeeds'
+import { CALC_CAT_LABELS, CALC_SEEDS, MEAL_PRICE_OPTIONS } from '../data/calculatorSeeds'
 import type { CalcState, CalcCustomItem } from '../types'
+
+function GuestPopup({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 290, textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 36, marginBottom: 10 }}>💾</div>
+        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>저장 불가</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 18 }}>게스트 모드에서는 데이터가<br/>저장되지 않아요.<br/>회원가입 후 이용해주세요.</div>
+        <button onClick={onClose} style={{ width: '100%', background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>확인</button>
+      </div>
+    </div>
+  )
+}
 
 type CalcType = 'wedding' | 'honeymoon' | 'house'
 
+// n is in 만원
 function fmt(n: number) {
-  if (Math.abs(n) >= 100000000) return `${(n / 100000000).toFixed(1)}억원`
-  if (Math.abs(n) >= 10000) return `${Math.round(n / 10000).toLocaleString()}만원`
-  return `${n.toLocaleString()}원`
+  if (n === 0) return '0만원'
+  if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(1)}억원`
+  return `${n.toLocaleString()}만원`
 }
 
 export default function CalculatorPage() {
   const { type = 'wedding' } = useParams<{ type: string }>()
   const calcType = type as CalcType
+  const user = useAuthStore(s => s.user)
   const userData = useAuthStore(s => s.userData)!
   const setUserData = useAuthStore(s => s.setUserData)
   const saveUserData = useAuthStore(s => s.saveUserData)
+  const isGuest = user?.nick === '게스트'
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [addInputs, setAddInputs] = useState<Record<string, string>>({})
   const [budgetInput, setBudgetInput] = useState('')
+  const [guestPopup, setGuestPopup] = useState(false)
 
   const calcKey = calcType === 'wedding' ? 'calcWedding' : calcType === 'honeymoon' ? 'calcHoneymoon' : 'calcHouse'
   const calc = userData[calcKey]
@@ -34,7 +51,14 @@ export default function CalculatorPage() {
     Object.entries(seeds).forEach(([catKey, seedItems]) => {
       const cat = newCats[catKey]
       if (!cat) return
-      if (cat.defItems.length === 0) {
+      // Reinitialize if empty, old 원-based seeds, item count changed, or any name typo
+      const hasOldUnits = cat.defItems.some(it => it.avg >= 10000)
+      const hasNameMismatch = cat.defItems.some(it => {
+        const seed = seedItems.find(s => s[0] === it.id)
+        return seed && seed[1] !== it.name
+      })
+      const hasCountMismatch = seedItems.length > 0 && cat.defItems.length !== seedItems.length
+      if (cat.defItems.length === 0 || hasOldUnits || hasNameMismatch || hasCountMismatch) {
         newCats[catKey] = {
           ...cat,
           defItems: seedItems.map(([id, name, avg]) => ({
@@ -45,14 +69,18 @@ export default function CalculatorPage() {
       }
     })
     if (changed) {
-      const recomputed = computeTotal({ ...calc, cats: newCats })
+      const recomputed = computeTotal({ ...calc, cats: newCats }, calcType)
       setUserData({ ...userData, [calcKey]: recomputed })
       saveUserData()
     }
   }, [calcType]) // eslint-disable-line
 
-  function computeTotal(c: CalcState): CalcState {
+  function computeTotal(c: CalcState, ct: CalcType = calcType): CalcState {
     let total = 0
+    if (ct === 'wedding') {
+      total += Math.round((c.mealCount * c.mealPrice) / 10000)
+      total += c.venueDirect ?? 0
+    }
     Object.values(c.cats).forEach(cat => {
       cat.defItems.forEach(it => {
         if (it.checked && !it.deleted) total += it.customVal ? Number(it.customVal) || 0 : it.avg
@@ -63,6 +91,7 @@ export default function CalculatorPage() {
   }
 
   function updateCalc(newCalc: CalcState) {
+    if (isGuest) { setGuestPopup(true); return }
     const updated = computeTotal(newCalc)
     setUserData({ ...userData, [calcKey]: updated })
     saveUserData()
@@ -108,7 +137,14 @@ export default function CalculatorPage() {
     setAddInputs(prev => ({ ...prev, [catKey]: '' }))
   }
 
+  function deleteDefItem(catKey: string, itemId: string) {
+    const newCats = { ...calc.cats }
+    newCats[catKey] = { ...newCats[catKey], defItems: newCats[catKey].defItems.map(it => it.id === itemId ? { ...it, deleted: true } : it) }
+    updateCalc({ ...calc, cats: newCats })
+  }
+
   function saveBudget() {
+    if (isGuest) { setGuestPopup(true); return }
     const b = Number(budgetInput.replace(/,/g, '')) || 0
     updateCalc({ ...calc, budget: b })
   }
@@ -116,9 +152,11 @@ export default function CalculatorPage() {
   const catLabels = CALC_CAT_LABELS[calcType] || {}
   const diff = calc.budget - calc.totalCost
   const usedPct = calc.budget > 0 ? Math.min(100, Math.round(calc.totalCost / calc.budget * 100)) : 0
+  const mealTotal = calcType === 'wedding' ? Math.round((calc.mealCount * calc.mealPrice) / 10000) : 0
 
   return (
     <div>
+      {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
       {/* Summary card */}
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -148,11 +186,59 @@ export default function CalculatorPage() {
       {/* Budget input */}
       <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 14, boxShadow: '0 2px 12px rgba(255,107,157,.08)', border: '1.5px solid var(--pk4)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>목표 예산 설정</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input type='number' value={budgetInput} onChange={e => setBudgetInput(e.target.value)} onBlur={saveBudget} placeholder='예산 입력 (원)' style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '9px 12px', fontSize: 14, outline: 'none' }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type='number' value={budgetInput} onChange={e => setBudgetInput(e.target.value)} onBlur={saveBudget} onKeyDown={e => e.key === 'Enter' && saveBudget()} placeholder='예산 입력' style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '9px 12px', fontSize: 14, outline: 'none' }} />
+          <span style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'nowrap' }}>만원</span>
           <button onClick={saveBudget} style={{ background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>저장</button>
         </div>
       </div>
+
+      {/* Meal & Venue section (wedding only) */}
+      {calcType === 'wedding' && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 14, boxShadow: '0 2px 12px rgba(255,107,157,.08)', border: '1.5px solid var(--pk4)' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12 }}>식사 및 대관료</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, minWidth: 60, color: 'var(--text2)' }}>식사 인원</span>
+              <input
+                type='number'
+                value={calc.mealCount}
+                onChange={e => updateCalc({ ...calc, mealCount: Number(e.target.value) || 0 })}
+                style={{ width: 80, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, textAlign: 'right', outline: 'none' }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text2)' }}>명</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, minWidth: 60, color: 'var(--text2)' }}>식사 단가</span>
+              <select
+                value={calc.mealPrice}
+                onChange={e => updateCalc({ ...calc, mealPrice: Number(e.target.value) })}
+                style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none', background: '#fff' }}
+              >
+                {MEAL_PRICE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, minWidth: 60, color: 'var(--text2)' }}>대관료</span>
+              <input
+                type='number'
+                value={calc.venueDirect || 0}
+                onChange={e => updateCalc({ ...calc, venueDirect: Number(e.target.value) || 0 })}
+                style={{ width: 100, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, textAlign: 'right', outline: 'none' }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text2)' }}>만원</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--pk)', fontWeight: 700, marginTop: 2 }}>
+              소계: {fmt(mealTotal + (calc.venueDirect || 0))}
+              <span style={{ color: 'var(--text2)', fontWeight: 400, marginLeft: 8 }}>
+                (식대 {fmt(mealTotal)} + 대관료 {fmt(calc.venueDirect || 0)})
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Categories */}
       {Object.entries(calc.cats).map(([catKey, cat]) => {
@@ -183,9 +269,10 @@ export default function CalculatorPage() {
                       type='number'
                       value={it.customVal !== '' ? it.customVal : it.avg}
                       onChange={e => setDefAmt(catKey, it.id, e.target.value)}
-                      style={{ width: 120, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 8px', fontSize: 12, textAlign: 'right', opacity: it.checked ? 1 : 0.45 }}
+                      style={{ width: 80, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 8px', fontSize: 12, textAlign: 'right', opacity: it.checked ? 1 : 0.45, outline: 'none' }}
                     />
-                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 14 }}>원</span>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 22 }}>만원</span>
+                    <button onClick={() => deleteDefItem(catKey, it.id)} title='행 삭제' style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 14, padding: '2px', flexShrink: 0, lineHeight: 1 }}>✕</button>
                   </div>
                 ))}
 
@@ -197,9 +284,9 @@ export default function CalculatorPage() {
                       type='number'
                       value={it.price}
                       onChange={e => setCustomAmt(catKey, it.id, e.target.value)}
-                      style={{ width: 120, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 8px', fontSize: 12, textAlign: 'right' }}
+                      style={{ width: 80, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 8px', fontSize: 12, textAlign: 'right', outline: 'none' }}
                     />
-                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 14 }}>원</span>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 22 }}>만원</span>
                     <button onClick={() => delCustom(catKey, it.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--pk3)', fontSize: 14, padding: '2px' }}>🗑️</button>
                   </div>
                 ))}

@@ -103,11 +103,15 @@ export default function BoardPage() {
           style={{ width: '100%', border: '1.5px solid var(--gray2)', borderRadius: 10, padding: '11px 14px', fontSize: 15, fontWeight: 700, outline: 'none', marginBottom: 10, boxSizing: 'border-box' }}
         />
         <textarea
-          value={editData?.content || ''} onChange={e => setEditData(p => ({ ...p!, content: e.target.value }))}
-          placeholder='내용을 입력하세요'
+          value={editData?.content || ''} onChange={e => setEditData(p => ({ ...p!, content: e.target.value.slice(0, 5000) }))}
+          placeholder='내용을 입력하세요 (최대 5,000자)'
           rows={14}
+          maxLength={5000}
           style={{ width: '100%', border: '1.5px solid var(--gray2)', borderRadius: 10, padding: '11px 14px', fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7, boxSizing: 'border-box' }}
         />
+        <div style={{ fontSize: 11, color: (editData?.content || '').length >= 4500 ? '#e03060' : 'var(--text2)', textAlign: 'right', marginBottom: 4 }}>
+          {(editData?.content || '').length.toLocaleString()} / 5,000자
+        </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button onClick={() => setView('list')} style={{ flex: 1, background: 'var(--gray1)', color: 'var(--text2)', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>취소</button>
           <button onClick={submitPost} style={{ flex: 2, background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>저장</button>

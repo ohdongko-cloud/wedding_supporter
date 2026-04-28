@@ -30,6 +30,7 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
     calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'etc']),
     calcHoneymoon: makeDefaultCalcState(['flight', 'accommodation', 'food', 'transport', 'activity', 'shopping', 'insurance', 'etc']),
     calcHouse: makeDefaultCalcState(['deposit', 'loan', 'agent', 'moving', 'appliance', 'furniture', 'interior', 'supplies', 'etc']),
+    venueName: '',
     memos: [], createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString(),
   }
 }

@@ -64,13 +64,14 @@ export default function MemoPage() {
         />
         <textarea
           value={editData?.content || ''}
-          onChange={e => setEditData(p => ({ ...p!, content: e.target.value.slice(0, 300000) }))}
-          placeholder='내용 (최대 30만 자)'
+          onChange={e => setEditData(p => ({ ...p!, content: e.target.value.slice(0, 3000) }))}
+          placeholder='내용 (최대 3,000자)'
           rows={18}
+          maxLength={3000}
           style={{ width: '100%', border: '1.5px solid var(--gray2)', borderRadius: 10, padding: '11px 14px', fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7, boxSizing: 'border-box' }}
         />
-        <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'right', marginBottom: 10 }}>
-          {(editData?.content || '').length.toLocaleString()} / 300,000자
+        <div style={{ fontSize: 11, color: (editData?.content || '').length >= 2800 ? '#e03060' : 'var(--text2)', textAlign: 'right', marginBottom: 10 }}>
+          {(editData?.content || '').length.toLocaleString()} / 3,000자
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setView(editData?.id ? 'detail' : 'list')} style={{ flex: 1, background: 'var(--gray1)', color: 'var(--text2)', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>취소</button>

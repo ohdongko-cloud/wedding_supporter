@@ -64,6 +64,9 @@ export default function AuthPage() {
         </div>
         <div style={{ fontSize: 12, color: '#e03060', minHeight: 16, marginBottom: 8 }}>{error}</div>
         <button style={{ width: '100%', border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg,var(--pk),var(--mn))', color: '#fff' }} onClick={submit}>{mode === 'register' ? '시작하기 →' : '불러오기 →'}</button>
+        {mode === 'register' && (
+          <button style={{ width: '100%', border: '1.5px solid var(--gray2)', borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 600, cursor: 'pointer', background: 'var(--gray1)', color: 'var(--text2)', marginTop: 8 }} onClick={() => { loginAnon(); navigate('/') }}>저장 없이 둘러보기</button>
+        )}
         <button style={{ width: '100%', border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'var(--gray1)', color: 'var(--text2)', marginTop: 8 }} onClick={() => setMode('splash')}>← 돌아가기</button>
       </div>
     </div>

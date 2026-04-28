@@ -24,7 +24,7 @@ export interface Post {
   views: number; likes: number; comments: Comment[]; createdAt: string; updatedAt?: string
 }
 export interface UserData {
-  nick: string; pinHash: string; weddingDate: string; totalBudget: number
+  nick: string; pinHash: string; weddingDate: string; totalBudget: number; venueName: string
   checklist: Record<string, ChecklistStageState>
   calcWedding: CalcState; calcHoneymoon: CalcState; calcHouse: CalcState
   memos: Memo[]; createdAt: string; lastLoginAt: string
