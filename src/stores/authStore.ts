@@ -9,6 +9,8 @@ export function hashPin(pin: string): string {
   return h.toString(36)
 }
 
+type CalcState = import('../types').CalcState
+
 function makeDefaultCalcState(catKeys: string[]): CalcState {
   const cats: Record<string, import('../types').CalcCategory> = {}
   catKeys.forEach(c => { cats[c] = { defItems: [], customItems: [] } })
@@ -25,14 +27,20 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
   })
   return {
     nick, pinHash, weddingDate: '', totalBudget: 0, checklist,
-    calcWedding: makeDefaultCalcState(['wedding','studio','dress','makeup','etc']),
-    calcHoneymoon: makeDefaultCalcState(['flight','accommodation','food','transport','activity','shopping','insurance','etc']),
-    calcHouse: makeDefaultCalcState(['deposit','loan','agent','moving','appliance','furniture','interior','supplies','etc']),
+    calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'etc']),
+    calcHoneymoon: makeDefaultCalcState(['flight', 'accommodation', 'food', 'transport', 'activity', 'shopping', 'insurance', 'etc']),
+    calcHouse: makeDefaultCalcState(['deposit', 'loan', 'agent', 'moving', 'appliance', 'furniture', 'interior', 'supplies', 'etc']),
     memos: [], createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString(),
   }
 }
 
-type CalcState = import('../types').CalcState
+export function seedAdminUser() {
+  if (!StorageService.get(userKey('admin'))) {
+    const data = buildDefaultUserData('admin', hashPin('000000'))
+    StorageService.set(userKey('admin'), data)
+    StorageService.addToRegistry('admin')
+  }
+}
 
 interface AuthState {
   user: AuthUser | null; userData: UserData | null
@@ -45,13 +53,15 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null, userData: null,
   register(nick, pin) {
-    if (nick.length < 2) return { ok: false, error: '닉네임은 2자 이상 입력해주세요.' }
+    if (nick.trim().length < 2) return { ok: false, error: '닉네임은 2자 이상 입력해주세요.' }
+    if (nick.toLowerCase() === 'admin') return { ok: false, error: '사용할 수 없는 닉네임이에요.' }
     if (pin.length < 6) return { ok: false, error: '비밀번호 6자리를 모두 입력해주세요.' }
     const existing = StorageService.get<UserData>(userKey(nick))
     if (existing) return { ok: false, error: '이미 사용 중인 닉네임이에요.' }
     const ph = hashPin(pin)
     const data = buildDefaultUserData(nick, ph)
     StorageService.set(userKey(nick), data)
+    StorageService.addToRegistry(nick)
     set({ user: { nick, pinHash: ph }, userData: data })
     return { ok: true }
   },
@@ -63,6 +73,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (saved.pinHash !== hashPin(pin)) return { ok: false, error: '비밀번호가 일치하지 않아요.' }
     saved.lastLoginAt = new Date().toISOString()
     StorageService.set(userKey(nick), saved)
+    StorageService.addToRegistry(nick)
     set({ user: { nick, pinHash: saved.pinHash }, userData: saved })
     return { ok: true }
   },

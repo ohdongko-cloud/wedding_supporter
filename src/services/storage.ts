@@ -7,5 +7,10 @@ export const StorageService = {
     try { localStorage.setItem(PREFIX + key, JSON.stringify(value)) } catch { console.error('storage set failed', key) }
   },
   del(key: string): void { localStorage.removeItem(PREFIX + key) },
+  addToRegistry(nick: string): void {
+    const lower = nick.toLowerCase()
+    const reg: string[] = StorageService.get<string[]>('registry') || []
+    if (!reg.includes(lower)) { reg.push(lower); StorageService.set('registry', reg) }
+  },
 }
 export function userKey(nick: string): string { return nick.toLowerCase() }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { CHECKLIST_STAGES } from '../data/checklistSeed'
 import type { ChecklistSeedItem } from '../types'
@@ -7,6 +7,22 @@ export default function ChecklistPage() {
   const setUserData = useAuthStore(s => s.setUserData)
   const saveUserData = useAuthStore(s => s.saveUserData)
   const [openStages, setOpenStages] = useState<Record<string, boolean>>({})
+
+  // Merge any new seed items that existing users don't have yet
+  useEffect(() => {
+    const cl = JSON.parse(JSON.stringify(userData.checklist)) as typeof userData.checklist
+    let changed = false
+    CHECKLIST_STAGES.forEach(stage => {
+      if (!cl[stage.id]) { cl[stage.id] = { items: [], customItems: [] }; changed = true }
+      stage.items.forEach(seedItem => {
+        if (!cl[stage.id].items.find(it => it.id === seedItem.id)) {
+          cl[stage.id].items.push({ id: seedItem.id, completed: false, hidden: false })
+          changed = true
+        }
+      })
+    })
+    if (changed) { setUserData({ ...userData, checklist: cl }); saveUserData() }
+  }, []) // eslint-disable-line
   const [infoItem, setInfoItem] = useState<ChecklistSeedItem | null>(null)
   const [addInputs, setAddInputs] = useState<Record<string, string>>({})
   let total = 0, done = 0
