@@ -2,6 +2,25 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 
+function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 300, textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 36, marginBottom: 10 }}>⚠️</div>
+        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>초기화 및 삭제</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 6 }}>
+          <b style={{ color: 'var(--pk)' }}>{nick}</b> 계정을 삭제하면<br />로그인이 불가능해집니다.
+        </div>
+        <div style={{ fontSize: 12, color: '#e03060', marginBottom: 18 }}>이 작업은 되돌릴 수 없습니다.</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, background: 'var(--gray1)', color: 'var(--text)', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>취소</button>
+          <button onClick={onConfirm} style={{ flex: 1, background: '#e03060', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const NAV_ITEMS = [
   { path: '/', label: '메인 페이지', icon: '🏠' },
   { path: '/checklist', label: '결혼 체크리스트', icon: '✅' },
@@ -27,17 +46,28 @@ interface LayoutProps { children: React.ReactNode }
 
 export default function Layout({ children }: LayoutProps) {
   const [sideOpen, setSideOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
   const logout = useAuthStore(s => s.logout)
+  const deleteAccount = useAuthStore(s => s.deleteAccount)
   const isAdmin = user?.nick === 'admin'
+  const isGuest = user?.nick === '게스트'
   const title = PAGE_TITLES[location.pathname] ?? '나만의 결혼 서포터'
 
   function go(path: string) { navigate(path); setSideOpen(false) }
 
+  function handleDelete() {
+    deleteAccount()
+    setDeleteConfirm(false)
+    setSideOpen(false)
+    navigate('/auth')
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {deleteConfirm && <DeleteConfirmPopup nick={user?.nick ?? ''} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />}
       <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'linear-gradient(135deg,var(--pk),var(--mn))', display: 'flex', alignItems: 'center', padding: '0 16px', height: 56, boxShadow: '0 2px 12px rgba(255,107,157,.3)' }}>
         <button onClick={() => setSideOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: '6px 8px 6px 0' }}>☰</button>
         <span style={{ flex: 1, textAlign: 'center', color: '#fff', fontSize: 16, fontWeight: 800 }}>{title}</span>
@@ -68,6 +98,11 @@ export default function Layout({ children }: LayoutProps) {
           <button onClick={() => { logout(); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>
             <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🚪</span>로그아웃
           </button>
+          {!isGuest && !isAdmin && (
+            <button onClick={() => setDeleteConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#e03060' }}>
+              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🗑️</span>초기화 및 삭제
+            </button>
+          )}
         </div>
       </nav>
 

@@ -26,7 +26,7 @@ function GuestPopup({ onClose }: { onClose: () => void }) {
       <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 290, textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 36, marginBottom: 10 }}>💾</div>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>저장 불가</div>
-        <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 18 }}>게스트 모드에서는 데이터가<br/>저장되지 않아요.<br/>회원가입 후 이용해주세요.</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 18 }}>게스트 모드에서는 데이터가<br/>저장되지 않아요.<br/>닉네임으로 로그인 후 이용해주세요.</div>
         <button onClick={onClose} style={{ width: '100%', background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>확인</button>
       </div>
     </div>

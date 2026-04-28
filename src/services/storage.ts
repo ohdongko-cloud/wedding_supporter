@@ -12,5 +12,10 @@ export const StorageService = {
     const reg: string[] = StorageService.get<string[]>('registry') || []
     if (!reg.includes(lower)) { reg.push(lower); StorageService.set('registry', reg) }
   },
+  removeFromRegistry(nick: string): void {
+    const lower = nick.toLowerCase()
+    const reg: string[] = StorageService.get<string[]>('registry') || []
+    StorageService.set('registry', reg.filter(n => n !== lower))
+  },
 }
 export function userKey(nick: string): string { return nick.toLowerCase() }

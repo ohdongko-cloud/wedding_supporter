@@ -55,6 +55,7 @@ interface AuthState {
   register: (nick: string, pin: string) => { ok: boolean; error?: string }
   loginAnon: () => void; logout: () => void
   saveUserData: () => void; setUserData: (data: UserData) => void
+  deleteAccount: () => void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -88,4 +89,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout() { set({ user: null, userData: null }) },
   saveUserData() { const { user, userData } = get(); if (user && user.nick !== '게스트' && userData) StorageService.set(userKey(user.nick), userData) },
   setUserData(data) { set({ userData: data }) },
+  deleteAccount() {
+    const { user } = get()
+    if (!user || user.nick === '게스트') return
+    const data = StorageService.get<UserData>(userKey(user.nick))
+    if (data) StorageService.set(userKey(user.nick), { ...data, pinHash: '__deleted__' })
+    StorageService.removeFromRegistry(user.nick)
+    set({ user: null, userData: null })
+  },
 }))

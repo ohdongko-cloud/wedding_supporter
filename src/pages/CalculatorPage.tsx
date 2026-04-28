@@ -4,18 +4,6 @@ import { useAuthStore } from '../stores/authStore'
 import { CALC_CAT_LABELS, CALC_SEEDS, MEAL_PRICE_OPTIONS } from '../data/calculatorSeeds'
 import type { CalcState, CalcCustomItem } from '../types'
 
-function GuestPopup({ onClose }: { onClose: () => void }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 290, textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 36, marginBottom: 10 }}>💾</div>
-        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>저장 불가</div>
-        <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 18 }}>게스트 모드에서는 데이터가<br/>저장되지 않아요.<br/>회원가입 후 이용해주세요.</div>
-        <button onClick={onClose} style={{ width: '100%', background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>확인</button>
-      </div>
-    </div>
-  )
-}
 
 type CalcType = 'wedding' | 'honeymoon' | 'house'
 
@@ -29,15 +17,12 @@ function fmt(n: number) {
 export default function CalculatorPage() {
   const { type = 'wedding' } = useParams<{ type: string }>()
   const calcType = type as CalcType
-  const user = useAuthStore(s => s.user)
   const userData = useAuthStore(s => s.userData)!
   const setUserData = useAuthStore(s => s.setUserData)
   const saveUserData = useAuthStore(s => s.saveUserData)
-  const isGuest = user?.nick === '게스트'
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [addInputs, setAddInputs] = useState<Record<string, string>>({})
   const [budgetInput, setBudgetInput] = useState('')
-  const [guestPopup, setGuestPopup] = useState(false)
 
   const calcKey = calcType === 'wedding' ? 'calcWedding' : calcType === 'honeymoon' ? 'calcHoneymoon' : 'calcHouse'
   const calc = userData[calcKey]
@@ -91,7 +76,6 @@ export default function CalculatorPage() {
   }
 
   function updateCalc(newCalc: CalcState) {
-    if (isGuest) { setGuestPopup(true); return }
     const updated = computeTotal(newCalc)
     setUserData({ ...userData, [calcKey]: updated })
     saveUserData()
@@ -144,7 +128,6 @@ export default function CalculatorPage() {
   }
 
   function saveBudget() {
-    if (isGuest) { setGuestPopup(true); return }
     const b = Number(budgetInput.replace(/,/g, '')) || 0
     updateCalc({ ...calc, budget: b })
   }
@@ -156,7 +139,6 @@ export default function CalculatorPage() {
 
   return (
     <div>
-      {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
       {/* Summary card */}
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
