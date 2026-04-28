@@ -6,8 +6,8 @@ export interface ChecklistSeedItem {
   cost: string; time: string; note: string
 }
 export interface ChecklistSeedStage { id: string; name: string; icon: string; items: ChecklistSeedItem[] }
-export interface ChecklistItemState { id: string; completed: boolean; hidden: boolean }
-export interface ChecklistCustomItem { id: string; title: string; completed: boolean }
+export interface ChecklistItemState { id: string; completed: boolean; hidden: boolean; deadline?: string }
+export interface ChecklistCustomItem { id: string; title: string; completed: boolean; deadline?: string }
 export interface ChecklistStageState { items: ChecklistItemState[]; customItems: ChecklistCustomItem[] }
 export interface CalcDefItem { id: string; name: string; avg: number; customVal: string; checked: boolean; deleted: boolean }
 export interface CalcCustomItem { id: string; name: string; price: number; checked: boolean }
