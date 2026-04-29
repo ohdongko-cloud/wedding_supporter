@@ -779,6 +779,14 @@ export default function HouseCalculatorPage() {
 
   const timelineSteps = mode === 'buy' ? BUY_STEPS : mode === 'jeonse' ? JEONSE_STEPS : RENT_STEPS
 
+  const budget = userData.calcHouse.budget || 0
+  const currentPrice = mode === 'buy' ? num(houseDetail.buy.price) : mode === 'jeonse' ? num(houseDetail.jeonse.price) : 0
+  const budgetDiff = budget > 0 && currentPrice > 0 ? budget - currentPrice : null
+
+  function updateBudget(val: number) {
+    setUserData({ ...userData, calcHouse: { ...userData.calcHouse, budget: val } })
+  }
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px 32px' }}>
       {/* Header */}
@@ -786,6 +794,36 @@ export default function HouseCalculatorPage() {
         <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>신혼집 비용 계산기</div>
         <div style={{ fontSize: 12, opacity: 0.85 }}>매매 · 전세 · 월세 시뮬레이션으로 현명한 집 마련 계획을 세워보세요.</div>
       </div>
+
+      {/* Budget goal — buy / jeonse only */}
+      {mode !== 'rent' && (
+        <div style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 14, padding: '16px 20px', color: '#fff', marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, opacity: .85, marginBottom: 8 }}>
+            🏠 목표 예산 ({mode === 'buy' ? '매매가' : '전세가'} 기준)
+          </div>
+          <input
+            type="number"
+            value={budget || ''}
+            onChange={e => updateBudget(parseInt(e.target.value) || 0)}
+            placeholder="목표 예산 입력 (만원)"
+            style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }}
+          />
+          {budget > 0 && currentPrice > 0 && budgetDiff !== null && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              {[
+                { label: '목표 예산', val: fmtWon(budget), warn: false },
+                { label: mode === 'buy' ? '매매가' : '전세가', val: fmtWon(currentPrice), warn: false },
+                { label: '여유 / 부족', val: budgetDiff >= 0 ? `+${fmtWon(budgetDiff)}` : `${fmtWon(Math.abs(budgetDiff))} 부족`, warn: budgetDiff < 0 },
+              ].map(({ label, val, warn }) => (
+                <div key={label} style={{ flex: 1, background: 'rgba(255,255,255,.15)', borderRadius: 8, padding: '8px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, opacity: .8, marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: warn ? '#fecaca' : '#fff' }}>{val}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab buttons */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
