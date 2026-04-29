@@ -42,7 +42,7 @@ export default function ShareModal({ shareUrl, onClose }: Props) {
             onClick={nativeShare}
             style={{ width: '100%', background: 'linear-gradient(135deg,#25d366,#128c7e)', color: '#fff', border: 'none', borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}
           >
-            📤 카카오·문자·SNS로 공유
+            📤 카카오·SNS로 공유
           </button>
         )}
         <button

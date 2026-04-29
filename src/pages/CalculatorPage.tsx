@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import { useAuthStore } from '../stores/authStore'
 import { CALC_CAT_LABELS, CALC_SEEDS, MEAL_PRICE_OPTIONS } from '../data/calculatorSeeds'
 import { VENUE_LIST, fmtHallLabel, fmtVenuePrice } from '../data/venueSeed'
@@ -7,8 +8,72 @@ import { AnalyticsService } from '../services/analytics'
 import type { CalcState, CalcCustomItem } from '../types'
 import BannerAd from '../components/ads/BannerAd'
 
-
 type CalcType = 'wedding' | 'honeymoon' | 'house'
+
+// ── 결혼 스타일 프리셋 ──────────────────────────────────────────
+type WeddingStyle = 'minimal' | 'standard' | 'premium'
+
+const STYLE_CHECKED: Record<WeddingStyle, string[]> = {
+  minimal: [
+    'vi1','vi2','vi3','vi5',               // 결혼식장: 본식촬영·혼주헤어·사회자·부케
+    'st1','st14',                           // 스튜디오: 웨딩촬영·스냅
+    'dr2','dr9','dr13',                     // 드레스: 본식헬퍼·드레스지정·턱시도
+    'mk1','mk2',                            // 메이크업: 여성·남성 혼주
+    'et1','et2','et6',                      // 기타: 청첩장·반지·답례품
+  ],
+  standard: [
+    'vi1','vi2','vi3','vi4','vi5','vi6',   // + 축가·폐백음식
+    'st1','st14',
+    'dr2','dr9','dr13',
+    'mk1','mk2',
+    'et1','et2','et6',
+  ],
+  premium: [
+    'vi1','vi2','vi3','vi4','vi5','vi6','vi7','vi8','vi9','vi10','vi11','vi12','vi13','vi14','vi15','vi16','vi17',
+    'st1','st2','st3','st5','st6','st8','st9','st14',
+    'dr2','dr5','dr6','dr7','dr9','dr11','dr13',
+    'mk1','mk2','mk3','mk4','mk5','mk7',
+    'et1','et2','et3','et5','et6',
+  ],
+}
+const STYLE_MEAL: Record<WeddingStyle, { count: number; price: number }> = {
+  minimal:  { count: 150, price: 66000 },
+  standard: { count: 200, price: 77000 },
+  premium:  { count: 350, price: 99000 },
+}
+
+function WeddingStylePicker({ onSelect, onSkip }: { onSelect: (s: WeddingStyle) => void; onSkip: () => void }) {
+  const STYLES: { key: WeddingStyle; emoji: string; title: string; desc: string; color: string }[] = [
+    { key: 'minimal',  emoji: '🌿', title: '초심플 미니멀', desc: '필수 항목만 체크 · 150명 · 6.6만원/인', color: '#e8f5e9' },
+    { key: 'standard', emoji: '💍', title: '기본 충실한 결혼', desc: '인기 항목 포함 · 200명 · 7.7만원/인', color: 'var(--pk5)' },
+    { key: 'premium',  emoji: '👑', title: '풀스택 호화 결혼', desc: '모든 항목 체크 · 350명 · 9.9만원/인', color: '#fff8e1' },
+  ]
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 360, padding: '28px 20px', boxShadow: '0 24px 80px rgba(0,0,0,.25)' }}>
+        <div style={{ fontSize: 22, textAlign: 'center', marginBottom: 8 }}>💒</div>
+        <div style={{ fontSize: 18, fontWeight: 800, textAlign: 'center', marginBottom: 4 }}>어떤 스타일의 결혼을 준비 중이에요?</div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', marginBottom: 20 }}>선택하면 맞춤 항목이 자동으로 세팅돼요 ✨</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {STYLES.map(s => (
+            <button key={s.key} onClick={() => onSelect(s.key)}
+              style={{ display: 'flex', alignItems: 'center', gap: 14, background: s.color, border: '2px solid transparent', borderRadius: 14, padding: '16px 18px', cursor: 'pointer', textAlign: 'left', transition: 'border-color .15s' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--pk)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}
+            >
+              <span style={{ fontSize: 28 }}>{s.emoji}</span>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{s.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{s.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+        <button onClick={onSkip} style={{ width: '100%', background: 'none', border: 'none', marginTop: 16, fontSize: 13, color: 'var(--text2)', cursor: 'pointer', padding: '8px 0' }}>직접 입력할게요 →</button>
+      </div>
+    </div>
+  )
+}
 
 // n is in 만원
 function fmt(n: number) {
@@ -20,12 +85,16 @@ function fmt(n: number) {
 export default function CalculatorPage() {
   const { type = 'wedding' } = useParams<{ type: string }>()
   const calcType = type as CalcType
+  const location = useLocation()
   const userData = useAuthStore(s => s.userData)!
   const setUserData = useAuthStore(s => s.setUserData)
   const saveUserData = useAuthStore(s => s.saveUserData)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [addInputs, setAddInputs] = useState<Record<string, string>>({})
   const [budgetInput, setBudgetInput] = useState('')
+  const [showStylePicker, setShowStylePicker] = useState(
+    calcType === 'wedding' && !!(location.state as any)?.fromOnboarding
+  )
 
   const calcKey = calcType === 'wedding' ? 'calcWedding' : calcType === 'honeymoon' ? 'calcHoneymoon' : 'calcHouse'
   const calc = userData[calcKey]
@@ -83,6 +152,48 @@ export default function CalculatorPage() {
     const updated = computeTotal(newCalc)
     setUserData({ ...userData, [calcKey]: updated })
     saveUserData()
+  }
+
+  function applyStyle(style: WeddingStyle) {
+    const checked = new Set(STYLE_CHECKED[style])
+    const meal = STYLE_MEAL[style]
+    const newCats = { ...calc.cats }
+    Object.entries(newCats).forEach(([catKey, cat]) => {
+      newCats[catKey] = {
+        ...cat,
+        defItems: cat.defItems.map(it => ({ ...it, checked: checked.has(it.id) })),
+      }
+    })
+    updateCalc({ ...calc, cats: newCats, mealCount: meal.count, mealPrice: meal.price })
+    setShowStylePicker(false)
+  }
+
+  function exportExcel() {
+    const catLabels = CALC_CAT_LABELS[calcType] || {}
+    const rows: (string | number)[][] = [['카테고리', '항목', '선택', '금액(만원)']]
+    if (calcType === 'wedding') {
+      const ep = calc.mealPrice === 0 ? (calc.mealCustom || 0) : calc.mealPrice
+      const mt = Math.round((calc.mealCount * ep) / 10000)
+      rows.push(['식사/대관', `하객 ${calc.mealCount}명 × ${(ep / 10000).toFixed(1)}만원/인`, '✓', mt])
+      rows.push(['식사/대관', `예식장 대관료`, '✓', calc.venueDirect ?? 0])
+    }
+    Object.entries(calc.cats).forEach(([catKey, cat]) => {
+      const label = catLabels[catKey] || catKey
+      cat.defItems.filter(it => !it.deleted).forEach(it => {
+        const amt = it.customVal ? Number(it.customVal) || 0 : it.avg
+        rows.push([label, it.name, it.checked ? '✓' : '', it.checked ? amt : 0])
+      })
+      cat.customItems.forEach(it => {
+        rows.push([label, it.name, it.checked ? '✓' : '', it.checked ? it.price : 0])
+      })
+    })
+    rows.push(['', '', '합계', calc.totalCost])
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    ws['!cols'] = [{ wch: 18 }, { wch: 24 }, { wch: 6 }, { wch: 12 }]
+    const wb = XLSX.utils.book_new()
+    const sheetName = calcType === 'wedding' ? '결혼식비용' : calcType === 'honeymoon' ? '신혼여행비용' : '신혼집비용'
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+    XLSX.writeFile(wb, `딸깍_${sheetName}.xlsx`)
   }
 
   function toggleDef(catKey: string, itemId: string) {
@@ -144,7 +255,9 @@ export default function CalculatorPage() {
 
   return (
     <div>
-      {/* Summary card */}
+      {showStylePicker && calcType === 'wedding' && (
+        <WeddingStylePicker onSelect={applyStyle} onSkip={() => setShowStylePicker(false)} />
+      )}
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           {[
@@ -171,13 +284,27 @@ export default function CalculatorPage() {
       </div>
 
       {/* Budget input */}
-      <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 14, boxShadow: '0 2px 12px rgba(255,107,157,.08)', border: '1.5px solid var(--pk4)' }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 8, boxShadow: '0 2px 12px rgba(255,107,157,.08)', border: '1.5px solid var(--pk4)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>목표 예산 설정</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type='number' value={budgetInput} onChange={e => setBudgetInput(e.target.value)} onBlur={saveBudget} onKeyDown={e => e.key === 'Enter' && saveBudget()} placeholder='예산 입력' style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '9px 12px', fontSize: 14, outline: 'none' }} />
           <span style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'nowrap' }}>만원</span>
           <button onClick={saveBudget} style={{ background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>저장</button>
         </div>
+      </div>
+
+      {/* 엑셀 다운로드 버튼 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <button onClick={exportExcel}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#fff', border: '1.5px solid #22a55a', borderRadius: 10, padding: '10px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#22a55a' }}>
+          📊 엑셀로 다운받기
+        </button>
+        {calcType === 'wedding' && (
+          <button onClick={() => setShowStylePicker(true)}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#fff', border: '1.5px solid var(--pk)', borderRadius: 10, padding: '10px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: 'var(--pk)' }}>
+            💒 스타일 변경
+          </button>
+        )}
       </div>
 
       {/* Meal & Venue section (wedding only) */}

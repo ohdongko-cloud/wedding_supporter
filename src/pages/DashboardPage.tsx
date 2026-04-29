@@ -6,7 +6,6 @@ import { BoardService } from '../services/boardService'
 import { MiniCalendar, WeeklyTasks, MonthTimeline } from '../components/ChecklistWidgets'
 import type { DeadlineItem } from '../components/ChecklistWidgets'
 import type { CalcState, Post } from '../types'
-import TourOverlay from '../components/onboarding/TourOverlay'
 import OnboardingWizard from '../components/OnboardingWizard'
 
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
@@ -51,7 +50,6 @@ export default function DashboardPage() {
   const [saved, setSaved] = useState(false)
   const [guestPopup, setGuestPopup] = useState(false)
   const [recentPosts, setRecentPosts] = useState<Post[]>([])
-  const [showTour, setShowTour] = useState(false)
   const showOnboarding = !isGuest && userData.hasSeenOnboarding === false
 
   useEffect(() => {
@@ -59,49 +57,19 @@ export default function DashboardPage() {
     setRecentPosts(posts.slice(0, 4))
   }, [])
 
-  const GUEST_SKIP_KEY = 'ws_guest_tour_skip'
-  const GUEST_SEEN_KEY = 'ws_guest_tour_seen'
-
-  function completeOnboarding(date: string, budget: number) {
+  function completeOnboarding(date: string, budget: number, destination: 'dashboard' | 'calculator') {
     const updated = {
       ...userData,
       weddingDate: date || userData.weddingDate,
+      totalBudget: budget || userData.totalBudget,
       calcWedding: { ...userData.calcWedding, budget: budget || userData.calcWedding.budget },
       hasSeenOnboarding: true,
+      hasSeenTour: true,
     }
     setWeddingDate(date || userData.weddingDate)
     setUserData(updated)
     saveUserData()
-  }
-
-  useEffect(() => {
-    if (!isGuest && userData.hasSeenTour === false) {
-      const t = setTimeout(() => setShowTour(true), 600)
-      return () => clearTimeout(t)
-    }
-    if (isGuest) {
-      const seen = sessionStorage.getItem(GUEST_SEEN_KEY)
-      const until = localStorage.getItem(GUEST_SKIP_KEY)
-      if (!seen && (!until || Date.now() > parseInt(until))) {
-        const t = setTimeout(() => setShowTour(true), 600)
-        return () => clearTimeout(t)
-      }
-    }
-  }, [isGuest, userData.hasSeenTour])
-
-  function completeTour() {
-    setShowTour(false)
-    if (!isGuest) {
-      setUserData({ ...userData, hasSeenTour: true })
-      saveUserData()
-    } else {
-      sessionStorage.setItem(GUEST_SEEN_KEY, '1')
-    }
-  }
-
-  function skipTourWeek() {
-    localStorage.setItem(GUEST_SKIP_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000))
-    setShowTour(false)
+    if (destination === 'calculator') navigate('/calc/wedding', { state: { fromOnboarding: true } })
   }
 
   let total = 0, done = 0
@@ -156,7 +124,6 @@ export default function DashboardPage() {
     <div>
       {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
       {showOnboarding && <OnboardingWizard nick={userData.nick} onComplete={completeOnboarding} />}
-      {!showOnboarding && showTour && <TourOverlay onComplete={completeTour} onSkipWeek={isGuest ? skipTourWeek : undefined} />}
 
       {/* Wedding date + D-DAY */}
       <div data-tour="wedding-date" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>

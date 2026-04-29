@@ -9,12 +9,13 @@ export default function PartnerInviteModal({ nick, onClose }: Props) {
   const [copied, setCopied] = useState(false)
 
   async function copyNick() {
+    const text = `딸깍, 결혼비용 계산기\n공유 닉네임: ${nick}\nhttps://weddingsupporter.vercel.app`
     try {
-      await navigator.clipboard.writeText(nick)
+      await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      prompt('닉네임을 복사해서 파트너에게 알려주세요', nick)
+      prompt('아래 내용을 복사해서 파트너에게 보내주세요', text)
     }
   }
 
@@ -43,7 +44,7 @@ export default function PartnerInviteModal({ nick, onClose }: Props) {
           onClick={copyNick}
           style={{ width: '100%', background: copied ? '#22c55e' : 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'background .2s', marginBottom: 8 }}
         >
-          {copied ? '✅ 복사됐어요!' : '📋 닉네임 복사'}
+          {copied ? '✅ 복사됐어요!' : '📋 닉네임 복사 (링크 포함)'}
         </button>
 
         {/* PIN notice */}

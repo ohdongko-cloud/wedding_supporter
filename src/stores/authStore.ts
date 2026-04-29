@@ -121,9 +121,41 @@ interface AuthState {
   deleteAccount: () => void
 }
 
+// ── 로그인 영속성 ──────────────────────────────────────────────
+const AUTH_NICK_KEY = 'ws_auth_nick'
+const AUTH_PH_KEY   = 'ws_auth_ph'
+
+function saveAuthLocal(nick: string, ph: string) {
+  try { localStorage.setItem(AUTH_NICK_KEY, nick); localStorage.setItem(AUTH_PH_KEY, ph) } catch {}
+}
+function clearAuthLocal() {
+  try { localStorage.removeItem(AUTH_NICK_KEY); localStorage.removeItem(AUTH_PH_KEY) } catch {}
+}
+function loadAuthLocal(): { nick: string; ph: string } | null {
+  try {
+    const nick = localStorage.getItem(AUTH_NICK_KEY)
+    const ph   = localStorage.getItem(AUTH_PH_KEY)
+    return (nick && ph) ? { nick, ph } : null
+  } catch { return null }
+}
+
+// 앱 시작 시 로컬 저장 인증 복구
+const _saved = loadAuthLocal()
+let _initUser: AuthUser = { nick: '게스트', pinHash: '' }
+let _initUserData: UserData = buildDefaultUserData('게스트', '')
+if (_saved) {
+  const _localData = StorageService.get<UserData>(userKey(_saved.nick))
+  if (_localData && _localData.pinHash === _saved.ph) {
+    _initUser     = { nick: _saved.nick, pinHash: _saved.ph }
+    _initUserData = _localData
+  } else {
+    clearAuthLocal()
+  }
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: { nick: '게스트', pinHash: '' },
-  userData: buildDefaultUserData('게스트', ''),
+  user: _initUser,
+  userData: _initUserData,
   isDirty: false, localUpdatedAt: null, isSaving: false, isLoading: false,
 
   async register(nick, pin, pinHint) {
@@ -140,11 +172,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     const ph = hashPin(pin)
-    const userData = buildDefaultUserData(nick, ph, pinHint?.trim() || undefined)
+    // 게스트로 입력한 데이터가 있으면 인계
+    const guestData = get().userData
+    const hasGuestData = guestData && guestData.nick === '게스트' &&
+      (!!guestData.weddingDate || guestData.calcWedding.budget > 0 || guestData.totalBudget > 0)
+    const userData = hasGuestData
+      ? { ...guestData, nick, pinHash: ph, pinHint: pinHint?.trim() || undefined, createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString() }
+      : buildDefaultUserData(nick, ph, pinHint?.trim() || undefined)
     const now = new Date().toISOString()
     StorageService.set(userKey(nick), userData)
     StorageService.addToRegistry(nick)
     await pushToCloud(nick, ph, userData, now)
+    saveAuthLocal(nick, ph)
     set({ user: { nick, pinHash: ph }, userData, localUpdatedAt: now, isLoading: false })
     return { ok: true }
   },
@@ -167,6 +206,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         userData.lastLoginAt = new Date().toISOString()
         StorageService.set(userKey(nick), userData)
         StorageService.addToRegistry(nick)
+        saveAuthLocal(nick, ph)
         set({ user: { nick, pinHash: ph }, userData, localUpdatedAt: row.updated_at ?? null, isLoading: false })
         return { ok: true }
       }
@@ -184,15 +224,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     StorageService.addToRegistry(nick)
     const now = new Date().toISOString()
     pushToCloud(nick, ph, saved, now)
+    saveAuthLocal(nick, ph)
     set({ user: { nick, pinHash: ph }, userData: saved, localUpdatedAt: now, isLoading: false })
     return { ok: true }
   },
 
   loginAnon() {
+    clearAuthLocal()
     set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
   },
 
-  logout() { set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null }) },
+  logout() {
+    clearAuthLocal()
+    set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
+  },
 
   async saveUserData() {
     const { user, userData, localUpdatedAt } = get()

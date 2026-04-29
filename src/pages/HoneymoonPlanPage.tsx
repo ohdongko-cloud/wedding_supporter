@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import * as XLSX from 'xlsx'
 import { useAuthStore } from '../stores/authStore'
 import type { HoneymoonPlanState, HoneymoonDay, HoneymoonScheduleItem } from '../types'
 import NativeAdCard from '../components/ads/NativeAdCard'
@@ -219,6 +220,21 @@ export default function HoneymoonPlanPage() {
     savePlan({ ...plan, budget: budgetNum })
   }
 
+  function exportExcel() {
+    const rows: (string | number)[][] = [['DAY', '날짜', '시간', '예약', '항목', '상세', '금액(만원)', '메모']]
+    plan.days.forEach(d => {
+      d.items.forEach(it => {
+        rows.push([`DAY ${d.dayNumber}`, d.date, it.time, it.reserved ? '✓' : '', it.title, it.detail, it.amount || 0, it.note])
+      })
+    })
+    rows.push(['', '', '', '', '', '합계', totalCost, ''])
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    ws['!cols'] = [{ wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 6 }, { wch: 18 }, { wch: 24 }, { wch: 10 }, { wch: 20 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '신혼여행일정')
+    XLSX.writeFile(wb, '딸깍_신혼여행일정.xlsx')
+  }
+
   function addDay(afterIdx?: number) {
     const newDay: HoneymoonDay = { id: uid(), dayNumber: 0, date: '', isOpen: true, items: [] }
     let days: HoneymoonDay[]
@@ -272,6 +288,12 @@ export default function HoneymoonPlanPage() {
           onClose={() => setDeleteTarget(null)}
         />
       )}
+
+      {/* 엑셀 다운로드 */}
+      <button onClick={exportExcel}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#fff', border: '1.5px solid #22a55a', borderRadius: 10, padding: '11px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#22a55a', marginBottom: 14 }}>
+        📊 엑셀로 다운받기
+      </button>
 
       {/* 공통 체크사항 카드 */}
       <div style={{ background: '#fff', borderRadius: 14, marginBottom: 14, border: '1.5px solid var(--pk4)', overflow: 'hidden', boxShadow: '0 4px 16px rgba(255,107,157,.08)' }}>
