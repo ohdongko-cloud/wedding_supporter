@@ -6,6 +6,8 @@ import { MiniCalendar, WeeklyTasks, MonthTimeline, getDDayLabel } from '../compo
 import type { DeadlineItem } from '../components/ChecklistWidgets'
 import type { ChecklistSeedItem } from '../types'
 import ConfettiCelebration from '../components/ConfettiCelebration'
+import BannerAd from '../components/ads/BannerAd'
+import { AdService } from '../services/AdService'
 
 export default function ChecklistPage() {
   const userData = useAuthStore(s => s.userData)!
@@ -118,7 +120,13 @@ export default function ChecklistPage() {
 
   return (
     <div>
-      {showConfetti && <ConfettiCelebration onClose={() => setShowConfetti(false)} />}
+      {showConfetti && (
+        <ConfettiCelebration onClose={() => {
+          setShowConfetti(false)
+          // 100% 완료 축하 후 전면 광고 노출
+          AdService.showInterstitial()
+        }} />
+      )}
       {/* Header with timeline */}
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '16px 16px 14px', marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -224,6 +232,9 @@ export default function ChecklistPage() {
           </div>
         </div>
       )}
+
+      {/* 배너 광고 — 페이지 최하단 */}
+      <BannerAd />
     </div>
   )
 }

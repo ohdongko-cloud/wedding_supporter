@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import type { HoneymoonPlanState, HoneymoonDay, HoneymoonScheduleItem } from '../types'
+import NativeAdCard from '../components/ads/NativeAdCard'
 
 function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
@@ -341,20 +342,25 @@ export default function HoneymoonPlanPage() {
         </button>
       </div>
 
-      {/* DAY 섹션 목록 */}
+      {/* DAY 섹션 목록 — 매 2번째 DAY 이후 네이티브 광고 삽입 */}
       {plan.days.map((day, idx) => (
-        <DaySection
-          key={day.id}
-          day={day}
-          isOnly={plan.days.length === 1}
-          onToggle={() => toggleDay(day.id)}
-          onUpdateDate={date => updateDayDate(day.id, date)}
-          onDeleteRequest={() => setDeleteTarget({ id: day.id, dayNumber: day.dayNumber })}
-          onInsertAfter={() => addDay(idx)}
-          onAddItem={() => addItem(day.id)}
-          onDeleteItem={itemId => deleteItem(day.id, itemId)}
-          onUpdateItem={(itemId, field, value) => updateItem(day.id, itemId, field, value)}
-        />
+        <div key={day.id}>
+          <DaySection
+            day={day}
+            isOnly={plan.days.length === 1}
+            onToggle={() => toggleDay(day.id)}
+            onUpdateDate={date => updateDayDate(day.id, date)}
+            onDeleteRequest={() => setDeleteTarget({ id: day.id, dayNumber: day.dayNumber })}
+            onInsertAfter={() => addDay(idx)}
+            onAddItem={() => addItem(day.id)}
+            onDeleteItem={itemId => deleteItem(day.id, itemId)}
+            onUpdateItem={(itemId, field, value) => updateItem(day.id, itemId, field, value)}
+          />
+          {/* 2번째 DAY마다 네이티브 광고 카드 삽입 */}
+          {(idx + 1) % 2 === 0 && idx < plan.days.length - 1 && (
+            <NativeAdCard />
+          )}
+        </div>
       ))}
 
       {/* DAY 추가 버튼 */}

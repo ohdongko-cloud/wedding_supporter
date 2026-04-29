@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import type { HouseDetail, HouseDetailBuy, HouseDetailJeonse, HouseDetailRent } from '../types'
+import BannerAd from '../components/ads/BannerAd'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -891,6 +892,9 @@ export default function HouseCalculatorPage() {
           onChange={rent => update({ ...houseDetail, rent })}
         />
       )}
+
+      {/* 배너 광고 — 페이지 최하단 */}
+      <BannerAd />
     </div>
   )
 }

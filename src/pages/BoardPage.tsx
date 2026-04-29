@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { BoardService } from '../services/boardService'
 import type { Post } from '../types'
+import RichEditor from '../components/RichEditor'
 
 type View = 'list' | 'detail' | 'edit'
 
@@ -103,16 +104,11 @@ export default function BoardPage() {
           placeholder='제목을 입력하세요'
           style={{ width: '100%', border: '1.5px solid var(--gray2)', borderRadius: 10, padding: '11px 14px', fontSize: 15, fontWeight: 700, outline: 'none', marginBottom: 10, boxSizing: 'border-box' }}
         />
-        <textarea
-          value={editData?.content || ''} onChange={e => setEditData(p => ({ ...p!, content: e.target.value.slice(0, 5000) }))}
-          placeholder='내용을 입력하세요 (최대 5,000자)'
-          rows={14}
-          maxLength={5000}
-          style={{ width: '100%', border: '1.5px solid var(--gray2)', borderRadius: 10, padding: '11px 14px', fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.7, boxSizing: 'border-box' }}
+        <RichEditor
+          value={editData?.content || ''}
+          onChange={html => setEditData(p => ({ ...p!, content: html }))}
+          placeholder='내용을 입력하세요 (최대 10,000자)'
         />
-        <div style={{ fontSize: 11, color: (editData?.content || '').length >= 4500 ? '#e03060' : 'var(--text2)', textAlign: 'right', marginBottom: 4 }}>
-          {(editData?.content || '').length.toLocaleString()} / 5,000자
-        </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button onClick={() => setView('list')} style={{ flex: 1, background: 'var(--gray1)', color: 'var(--text2)', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>취소</button>
           <button onClick={submitPost} style={{ flex: 2, background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>저장</button>
@@ -134,7 +130,10 @@ export default function BoardPage() {
           <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
             <span>{displayAuthor(post.author)}</span><span>{fmtDate(post.createdAt)}</span><span>조회 {post.views}</span>
           </div>
-          <div style={{ fontSize: 14, lineHeight: 1.85, whiteSpace: 'pre-wrap', borderTop: '1px solid var(--gray1)', paddingTop: 14 }}>{post.content}</div>
+          <div
+            style={{ fontSize: 14, lineHeight: 1.85, borderTop: '1px solid var(--gray1)', paddingTop: 14, overflowX: 'auto' }}
+            dangerouslySetInnerHTML={{ __html: post.content }}
+          />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--gray1)' }}>
             <button onClick={() => toggleLike(post)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: likedIds.has(post.id) ? 'var(--pk5)' : 'var(--gray1)', color: likedIds.has(post.id) ? 'var(--pk)' : 'var(--text2)', border: 'none', borderRadius: 20, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               ❤️ {post.likes}

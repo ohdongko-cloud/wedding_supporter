@@ -5,6 +5,7 @@ import { CALC_CAT_LABELS, CALC_SEEDS, MEAL_PRICE_OPTIONS } from '../data/calcula
 import { VENUE_LIST, fmtHallLabel, fmtVenuePrice } from '../data/venueSeed'
 import { AnalyticsService } from '../services/analytics'
 import type { CalcState, CalcCustomItem } from '../types'
+import BannerAd from '../components/ads/BannerAd'
 
 
 type CalcType = 'wedding' | 'honeymoon' | 'house'
@@ -370,6 +371,9 @@ export default function CalculatorPage() {
           </div>
         )
       })}
+
+      {/* 배너 광고 — 페이지 최하단 */}
+      <BannerAd />
     </div>
   )
 }
