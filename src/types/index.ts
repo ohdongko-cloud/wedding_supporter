@@ -19,9 +19,16 @@ export interface CalcState {
 }
 export interface Memo { id: string; title: string; content: string; createdAt: string; updatedAt?: string }
 export interface Comment { author: string; content: string; createdAt: string }
+export interface PostAttachment {
+  name: string      // 원본 파일명
+  size: number      // bytes
+  type: string      // MIME type
+  data: string      // base64 data URL
+}
 export interface Post {
   id: string; title: string; content: string; author: string; isNotice: boolean
   views: number; likes: number; comments: Comment[]; createdAt: string; updatedAt?: string
+  attachments?: PostAttachment[]
 }
 export interface HouseDetailBuy {
   targetContract: string; region: string; price: string

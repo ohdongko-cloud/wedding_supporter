@@ -1,8 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { BoardService } from '../services/boardService'
-import type { Post } from '../types'
+import type { Post, PostAttachment } from '../types'
 import RichEditor from '../components/RichEditor'
+
+const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3MB
+
+function fmtFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function getFileIcon(type: string) {
+  if (type.startsWith('image/')) return '🖼️'
+  if (type.includes('pdf')) return '📄'
+  if (type.includes('word') || type.includes('document')) return '📝'
+  if (type.includes('sheet') || type.includes('excel')) return '📊'
+  if (type.includes('zip') || type.includes('rar')) return '🗜️'
+  return '📎'
+}
 
 type View = 'list' | 'detail' | 'edit'
 
@@ -25,6 +51,9 @@ export default function BoardPage() {
   const [likedIds, setLikedIds] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(sessionStorage.getItem(`likes_${user.nick}`) || '[]')) } catch { return new Set() }
   })
+  const [attachments, setAttachments] = useState<PostAttachment[]>([])
+  const [fileError, setFileError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { setPosts(BoardService.getPosts()) }, [])
 
@@ -38,14 +67,14 @@ export default function BoardPage() {
     reload()
   }
 
-  function openCreate() { setEditData({ title: '', content: '', isNotice: false }); setView('edit') }
-  function openEdit(post: Post) { setEditData({ ...post }); setView('edit') }
+  function openCreate() { setEditData({ title: '', content: '', isNotice: false }); setAttachments([]); setFileError(''); setView('edit') }
+  function openEdit(post: Post) { setEditData({ ...post }); setAttachments(post.attachments ? [...post.attachments] : []); setFileError(''); setView('edit') }
 
   function submitPost() {
     if (!editData?.title?.trim() || !editData?.content?.trim()) return
-    if (editData.id) BoardService.updatePost(editData.id, editData.title, editData.content)
-    else BoardService.createPost(user.nick, editData.title, editData.content, editData.isNotice || false)
-    reload(); setView('list')
+    if (editData.id) BoardService.updatePost(editData.id, editData.title, editData.content, attachments)
+    else BoardService.createPost(user.nick, editData.title, editData.content, editData.isNotice || false, attachments)
+    setAttachments([]); reload(); setView('list')
   }
 
   function deletePost(id: string) {
@@ -80,6 +109,23 @@ export default function BoardPage() {
     if (updated && selected?.id === post.id) setSelected(updated)
   }
 
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setFileError('')
+    const files = Array.from(e.target.files || [])
+    const results: PostAttachment[] = [...attachments]
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) { setFileError(`"${file.name}" 파일이 3MB를 초과합니다.`); continue }
+      const data = await fileToBase64(file)
+      results.push({ name: file.name, size: file.size, type: file.type, data })
+    }
+    setAttachments(results)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function removeAttachment(idx: number) {
+    setAttachments(prev => prev.filter((_, i) => i !== idx))
+  }
+
   const filtered = posts.filter(p => p.title.includes(search) || p.author.includes(search))
   const sorted = [...filtered.filter(p => p.isNotice), ...filtered.filter(p => !p.isNotice)]
   const totalPages = Math.ceil(sorted.length / perPage)
@@ -109,6 +155,34 @@ export default function BoardPage() {
           onChange={html => setEditData(p => ({ ...p!, content: html }))}
           placeholder='내용을 입력하세요 (최대 10,000자)'
         />
+
+        {/* 파일 첨부 */}
+        <div style={{ marginTop: 12, padding: '12px 14px', background: 'var(--pk5)', borderRadius: 10, border: '1.5px solid var(--gray2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>📎 파일 첨부</span>
+            <span style={{ fontSize: 11, color: 'var(--text2)' }}>최대 3MB / 파일당</span>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{ marginLeft: 'auto', background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            >파일 선택</button>
+          </div>
+          <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} style={{ display: 'none' }} />
+          {fileError && <div style={{ fontSize: 12, color: '#e57373', marginBottom: 6 }}>{fileError}</div>}
+          {attachments.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {attachments.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderRadius: 7, padding: '6px 10px', border: '1px solid var(--gray2)' }}>
+                  <span style={{ fontSize: 16 }}>{getFileIcon(f.type)}</span>
+                  <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>{fmtFileSize(f.size)}</span>
+                  <button onClick={() => removeAttachment(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e57373', fontSize: 14, flexShrink: 0, padding: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button onClick={() => setView('list')} style={{ flex: 1, background: 'var(--gray1)', color: 'var(--text2)', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>취소</button>
           <button onClick={submitPost} style={{ flex: 2, background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>저장</button>
@@ -134,6 +208,23 @@ export default function BoardPage() {
             style={{ fontSize: 14, lineHeight: 1.85, borderTop: '1px solid var(--gray1)', paddingTop: 14, overflowX: 'auto' }}
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
+          {post.attachments && post.attachments.length > 0 && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--gray1)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>📎 첨부파일 ({post.attachments.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {post.attachments.map((f, i) => (
+                  <a key={i} href={f.data} download={f.name}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--pk5)', borderRadius: 8, padding: '7px 12px', border: '1px solid var(--pk4)', textDecoration: 'none', color: 'var(--text)' }}>
+                    <span style={{ fontSize: 16 }}>{getFileIcon(f.type)}</span>
+                    <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>{fmtFileSize(f.size)}</span>
+                    <span style={{ fontSize: 11, color: 'var(--pk)', fontWeight: 700, flexShrink: 0 }}>⬇ 다운로드</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--gray1)' }}>
             <button onClick={() => toggleLike(post)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: likedIds.has(post.id) ? 'var(--pk5)' : 'var(--gray1)', color: likedIds.has(post.id) ? 'var(--pk)' : 'var(--text2)', border: 'none', borderRadius: 20, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               ❤️ {post.likes}

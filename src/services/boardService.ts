@@ -1,5 +1,5 @@
 import { StorageService } from './storage'
-import type { Post, Comment } from '../types'
+import type { Post, Comment, PostAttachment } from '../types'
 
 const BOARD_KEY = 'board_data'
 
@@ -13,21 +13,25 @@ function save(data: BoardData) { StorageService.set(BOARD_KEY, data) }
 export const BoardService = {
   getPosts(): Post[] { return load().posts },
   getPost(id: string): Post | null { return load().posts.find(p => p.id === id) ?? null },
-  createPost(author: string, title: string, content: string, isNotice = false): Post {
+  createPost(author: string, title: string, content: string, isNotice = false, attachments: PostAttachment[] = []): Post {
     const data = load()
     const post: Post = {
       id: String(data.nextId++), title, content, author, isNotice,
       views: 0, likes: 0, comments: [], createdAt: new Date().toISOString(),
+      attachments,
     }
     data.posts.unshift(post)
     save(data)
     return post
   },
-  updatePost(id: string, title: string, content: string): boolean {
+  updatePost(id: string, title: string, content: string, attachments?: PostAttachment[]): boolean {
     const data = load()
     const idx = data.posts.findIndex(p => p.id === id)
     if (idx === -1) return false
-    data.posts[idx] = { ...data.posts[idx], title, content, updatedAt: new Date().toISOString() }
+    data.posts[idx] = {
+      ...data.posts[idx], title, content, updatedAt: new Date().toISOString(),
+      attachments: attachments ?? data.posts[idx].attachments,
+    }
     save(data)
     return true
   },
