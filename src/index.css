@@ -9,6 +9,10 @@ body {
   background: var(--bg); color: var(--text);
   font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   font-size: 14px; -webkit-font-smoothing: antialiased;
+  user-select: none; -webkit-user-select: none;
 }
 button { font-family: inherit; }
-input, textarea, select { font-family: inherit; }
+input, textarea, select {
+  font-family: inherit;
+  user-select: text; -webkit-user-select: text;
+}

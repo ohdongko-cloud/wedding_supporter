@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { CHECKLIST_STAGES } from '../data/checklistSeed'
+import { AnalyticsService } from '../services/analytics'
 import type { ChecklistSeedItem } from '../types'
 
 function parseDaysBefore(timeStr: string): number | null {
@@ -281,7 +282,10 @@ export default function ChecklistPage() {
     })
   })
 
-  function toggleStage(id: string) { setOpenStages(prev => ({ ...prev, [id]: !(prev[id] ?? true) })) }
+  function toggleStage(id: string) {
+    AnalyticsService.track(`checklist:${id}`)
+    setOpenStages(prev => ({ ...prev, [id]: !(prev[id] ?? true) }))
+  }
 
   function toggleItem(stageId: string, itemId: string, isCustom: boolean) {
     const cl = JSON.parse(JSON.stringify(userData.checklist)) as typeof userData.checklist

@@ -112,7 +112,6 @@ export const CALC_SEEDS: Record<string, Record<string, [string, string, number][
       ['et1', '청첩장', 10],
       ['et2', '결혼반지', 0],
       ['et3', '예물', 0],
-      ['et4', '프로포즈', 50],
       ['et5', '청첩장모임', 200],
       ['et6', '답례품', 50],
       ['et7', '관리 (네일/마사지 등)', 0],

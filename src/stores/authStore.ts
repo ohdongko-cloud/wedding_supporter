@@ -51,15 +51,17 @@ export function seedAdminUser() {
 
 interface AuthState {
   user: AuthUser | null; userData: UserData | null
+  isDirty: boolean; lastSavedAt: string | null
   login: (nick: string, pin: string) => { ok: boolean; error?: string }
   register: (nick: string, pin: string) => { ok: boolean; error?: string }
   loginAnon: () => void; logout: () => void
   saveUserData: () => void; setUserData: (data: UserData) => void
+  markDirty: () => void; markClean: () => void
   deleteAccount: () => void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null, userData: null,
+  user: null, userData: null, isDirty: false, lastSavedAt: null,
   register(nick, pin) {
     if (nick.trim().length < 2) return { ok: false, error: '닉네임은 2자 이상 입력해주세요.' }
     if (nick.toLowerCase() === 'admin') return { ok: false, error: '사용할 수 없는 닉네임이에요.' }
@@ -85,10 +87,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: { nick, pinHash: saved.pinHash }, userData: saved })
     return { ok: true }
   },
-  loginAnon() { const data = buildDefaultUserData('게스트', ''); set({ user: { nick: '게스트', pinHash: '' }, userData: data }) },
-  logout() { set({ user: null, userData: null }) },
-  saveUserData() { const { user, userData } = get(); if (user && user.nick !== '게스트' && userData) StorageService.set(userKey(user.nick), userData) },
-  setUserData(data) { set({ userData: data }) },
+  loginAnon() { const data = buildDefaultUserData('게스트', ''); set({ user: { nick: '게스트', pinHash: '' }, userData: data, isDirty: false, lastSavedAt: null }) },
+  logout() { set({ user: null, userData: null, isDirty: false, lastSavedAt: null }) },
+  saveUserData() {
+    const { user, userData } = get()
+    if (user && user.nick !== '게스트' && userData) {
+      StorageService.set(userKey(user.nick), userData)
+      set({ isDirty: false, lastSavedAt: new Date().toISOString() })
+    }
+  },
+  setUserData(data) { set({ userData: data, isDirty: true }) },
+  markDirty() { set({ isDirty: true }) },
+  markClean() { set({ isDirty: false }) },
   deleteAccount() {
     const { user } = get()
     if (!user || user.nick === '게스트') return

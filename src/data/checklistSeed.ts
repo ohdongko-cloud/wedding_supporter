@@ -4,7 +4,6 @@ export const CHECKLIST_STAGES: ChecklistSeedStage[] = [
   {
     id: 's1', name: '결혼 의사 확인', icon: '',
     items: [
-      { id: 'i1',  title: '프로포즈',              req: '선택', pri: '중',  cost: '30~200만',    time: 'D-300',  note: '방식/장소/예산 결정' },
       { id: 'i2',  title: '양가 부모님께 결혼 의사 공유', req: '필수', pri: '상',  cost: '0',           time: 'D-300',  note: '어느 쪽에 먼저 말씀드릴지' },
       { id: 'i3',  title: '결혼 시기 대략 설정',   req: '필수', pri: '상',  cost: '0',           time: 'D-365',  note: '성수기/비수기, 토요일/일요일' },
       { id: 'i4',  title: '결혼식장 대략 알아보기', req: '필수', pri: '상',  cost: '0',           time: 'D-365',  note: '지역/하객 수(대략)/예산 기준' },

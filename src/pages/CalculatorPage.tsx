@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { CALC_CAT_LABELS, CALC_SEEDS, MEAL_PRICE_OPTIONS } from '../data/calculatorSeeds'
+import { VENUE_LIST, fmtHallLabel, fmtVenuePrice } from '../data/venueSeed'
+import { AnalyticsService } from '../services/analytics'
 import type { CalcState, CalcCustomItem } from '../types'
 
 
@@ -178,100 +180,129 @@ export default function CalculatorPage() {
       </div>
 
       {/* Meal & Venue section (wedding only) */}
-      {calcType === 'wedding' && (
-        <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 14, boxShadow: '0 2px 12px rgba(255,107,157,.08)', border: '1.5px solid var(--pk4)' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12 }}>식사 및 대관료</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {calcType === 'wedding' && (() => {
+        const selectedVenue = VENUE_LIST.find(v => v.name === calc.venueHall) ?? null
+        const selectedHall = selectedVenue?.halls.find(h => h.name === calc.venueRoom) ?? null
+        return (
+          <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 14, boxShadow: '0 2px 12px rgba(255,107,157,.08)', border: '1.5px solid var(--pk4)' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12 }}>식사 및 대관료</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* 홀 유형 */}
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6, fontWeight: 600 }}>홀 유형</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {['웨딩홀', '호텔', '야외', '레스토랑', '기타'].map(hall => (
-                  <button
-                    key={hall}
-                    onClick={() => updateCalc({ ...calc, venueHall: calc.venueHall === hall ? '' : hall })}
-                    style={{
-                      padding: '5px 12px', borderRadius: 16, fontSize: 12, fontWeight: 700,
-                      border: '1.5px solid', cursor: 'pointer',
-                      borderColor: calc.venueHall === hall ? 'var(--pk)' : 'var(--gray2)',
-                      background: calc.venueHall === hall ? 'var(--pk)' : '#fff',
-                      color: calc.venueHall === hall ? '#fff' : 'var(--text2)',
-                    }}
-                  >{hall}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* 식사 인원 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>식사 인원</span>
-              <input
-                type='number'
-                value={calc.mealCount}
-                onChange={e => updateCalc({ ...calc, mealCount: Number(e.target.value) || 0 })}
-                style={{ width: 80, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, textAlign: 'right', outline: 'none' }}
-              />
-              <span style={{ fontSize: 13, color: 'var(--text2)' }}>명</span>
-            </div>
-
-            {/* 식사 단가 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>식사 단가</span>
-              <select
-                value={calc.mealPrice}
-                onChange={e => {
-                  const v = Number(e.target.value)
-                  updateCalc({ ...calc, mealPrice: v, mealCustom: v === 0 ? calc.mealCustom : 0 })
-                }}
-                style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none', background: '#fff' }}
-              >
-                {MEAL_PRICE_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-                <option value={0}>직접 입력</option>
-              </select>
-            </div>
-
-            {/* 단가 직접 입력 (mealPrice === 0 일 때) */}
-            {calc.mealPrice === 0 && (
+              {/* 1. 하객 인원 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>직접 입력</span>
+                <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>하객 인원</span>
                 <input
                   type='number'
-                  value={calc.mealCustom || ''}
-                  onChange={e => updateCalc({ ...calc, mealCustom: Number(e.target.value) || 0 })}
-                  placeholder='예: 120000'
-                  style={{ flex: 1, border: '1.5px solid var(--pk)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }}
+                  value={calc.mealCount}
+                  onChange={e => updateCalc({ ...calc, mealCount: Number(e.target.value) || 0 })}
+                  style={{ width: 80, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, textAlign: 'right', outline: 'none' }}
                 />
-                <span style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'nowrap' }}>원/인</span>
+                <span style={{ fontSize: 13, color: 'var(--text2)' }}>명</span>
               </div>
-            )}
 
-            {/* 대관료 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>대관료</span>
-              <input
-                type='number'
-                value={calc.venueDirect || 0}
-                onChange={e => updateCalc({ ...calc, venueDirect: Number(e.target.value) || 0 })}
-                style={{ width: 100, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, textAlign: 'right', outline: 'none' }}
-              />
-              <span style={{ fontSize: 13, color: 'var(--text2)' }}>만원</span>
-            </div>
+              {/* 2. 1인 식대 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>1인 식대</span>
+                <select
+                  value={calc.mealPrice}
+                  onChange={e => {
+                    const v = Number(e.target.value)
+                    updateCalc({ ...calc, mealPrice: v, mealCustom: v === 0 ? calc.mealCustom : 0 })
+                  }}
+                  style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none', background: '#fff' }}
+                >
+                  {MEAL_PRICE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                  <option value={0}>직접 입력</option>
+                </select>
+              </div>
+              {calc.mealPrice === 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>직접 입력</span>
+                  <input
+                    type='number'
+                    value={calc.mealCustom || ''}
+                    onChange={e => updateCalc({ ...calc, mealCustom: Number(e.target.value) || 0 })}
+                    placeholder='예: 120000'
+                    style={{ flex: 1, border: '1.5px solid var(--pk)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }}
+                  />
+                  <span style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'nowrap' }}>원/인</span>
+                </div>
+              )}
 
-            <div style={{ fontSize: 12, color: 'var(--pk)', fontWeight: 700, marginTop: 2 }}>
-              소계: {fmt(mealTotal + (calc.venueDirect || 0))}
-              <span style={{ color: 'var(--text2)', fontWeight: 400, marginLeft: 8 }}>
-                (식대 {fmt(mealTotal)} + 대관료 {fmt(calc.venueDirect || 0)})
-                {calc.mealPrice === 0 && calc.mealCustom > 0 && (
-                  <span style={{ marginLeft: 4 }}>· {(calc.mealCustom / 10000).toFixed(1)}만원/인 × {calc.mealCount}명</span>
-                )}
-              </span>
+              {/* 3. 예식장 선택 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>예식장</span>
+                <select
+                  value={calc.venueHall}
+                  onChange={e => {
+                    const venueName = e.target.value
+                    updateCalc({ ...calc, venueHall: venueName, venueRoom: '', venueDirect: 0 })
+                  }}
+                  style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none', background: '#fff' }}
+                >
+                  <option value=''>예식장 선택 (선택사항)</option>
+                  {VENUE_LIST.map(v => (
+                    <option key={v.name} value={v.name}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. 홀 선택 (예식장 선택 시 노출) */}
+              {selectedVenue && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>홀 선택</span>
+                  <select
+                    value={calc.venueRoom}
+                    onChange={e => {
+                      const hallName = e.target.value
+                      const hall = selectedVenue.halls.find(h => h.name === hallName)
+                      updateCalc({ ...calc, venueRoom: hallName, venueDirect: hall ? hall.price : 0 })
+                    }}
+                    style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none', background: '#fff' }}
+                  >
+                    <option value=''>홀 선택</option>
+                    {selectedVenue.halls.map(h => (
+                      <option key={h.name} value={h.name}>{fmtHallLabel(h)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 5. 대관료 직접 입력 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>대관료</span>
+                <input
+                  type='number'
+                  value={calc.venueDirect || ''}
+                  onChange={e => updateCalc({ ...calc, venueDirect: Number(e.target.value) || 0 })}
+                  placeholder={selectedHall ? (selectedHall.price === 0 ? '별도 문의' : String(selectedHall.price)) : '0'}
+                  style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--text2)' }}>만원</span>
+              </div>
+              {selectedHall && (
+                <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: -4 }}>
+                  선택 홀 기준: {fmtVenuePrice(selectedHall.price)}
+                  {selectedHall.price > 0 && ' (직접 입력 시 해당 값 적용)'}
+                </div>
+              )}
+
+              {/* 6. 소계 */}
+              <div style={{ fontSize: 12, color: 'var(--pk)', fontWeight: 700, marginTop: 4, paddingTop: 8, borderTop: '1px solid var(--gray1)' }}>
+                소계: {fmt(mealTotal + (calc.venueDirect || 0))}
+                <span style={{ color: 'var(--text2)', fontWeight: 400, marginLeft: 8 }}>
+                  (식대 {fmt(mealTotal)} + 대관료 {fmt(calc.venueDirect || 0)})
+                  {calc.mealPrice === 0 && calc.mealCustom > 0 && (
+                    <span style={{ marginLeft: 4 }}>· {(calc.mealCustom / 10000).toFixed(1)}만원/인 × {calc.mealCount}명</span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Categories */}
       {Object.entries(calc.cats).map(([catKey, cat]) => {
@@ -284,7 +315,7 @@ export default function CalculatorPage() {
 
         return (
           <div key={catKey} style={{ background: '#fff', borderRadius: 14, marginBottom: 10, boxShadow: '0 4px 20px rgba(255,107,157,.08)', overflow: 'hidden', border: '1.5px solid var(--pk4)' }}>
-            <div onClick={() => setCollapsed(p => ({ ...p, [catKey]: !p[catKey] }))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer', userSelect: 'none' }}>
+            <div onClick={() => { setCollapsed(p => ({ ...p, [catKey]: !p[catKey] })); AnalyticsService.track(`calc:${calcType}:${catKey}`) }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer', userSelect: 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 800 }}>{label}</span>
                 <span style={{ fontSize: 12, color: 'var(--pk)', fontWeight: 700 }}>{fmt(catTotal)}</span>

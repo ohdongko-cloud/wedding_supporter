@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
+import { DevRequestService } from '../../services/devRequests'
+import { AnalyticsService } from '../../services/analytics'
+import { useAutoSave } from '../../hooks/useAutoSave'
+import DevRequestModal from '../DevRequestModal'
 
 function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConfirm: () => void; onClose: () => void }) {
   return (
@@ -47,16 +51,30 @@ interface LayoutProps { children: React.ReactNode }
 export default function Layout({ children }: LayoutProps) {
   const [sideOpen, setSideOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [devRequestOpen, setDevRequestOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const location = useLocation()
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
+  const isDirty = useAuthStore(s => s.isDirty)
+  const lastSavedAt = useAuthStore(s => s.lastSavedAt)
   const logout = useAuthStore(s => s.logout)
   const deleteAccount = useAuthStore(s => s.deleteAccount)
   const isAdmin = user?.nick === 'admin'
   const isGuest = user?.nick === '게스트'
   const title = PAGE_TITLES[location.pathname] ?? '나만의 결혼 서포터'
 
-  function go(path: string) { navigate(path); setSideOpen(false) }
+  useAutoSave()
+
+  useEffect(() => {
+    if (isAdmin) setUnreadCount(DevRequestService.getUnreadCount())
+  }, [isAdmin, devRequestOpen, sideOpen])
+
+  function go(path: string) {
+    AnalyticsService.track(`nav:${path}`)
+    navigate(path)
+    setSideOpen(false)
+  }
 
   function handleDelete() {
     deleteAccount()
@@ -65,15 +83,39 @@ export default function Layout({ children }: LayoutProps) {
     navigate('/auth')
   }
 
+  function fmtSavedAt(iso: string) {
+    const d = new Date(iso)
+    const h = d.getHours(), m = d.getMinutes()
+    const ampm = h < 12 ? '오전' : '오후'
+    return `${ampm} ${h % 12 || 12}:${String(m).padStart(2, '0')}에 저장됨`
+  }
+
+  const saveStatus = isGuest ? null
+    : isDirty ? { text: '변경사항 있음', color: 'rgba(255,255,255,.65)' }
+    : lastSavedAt ? { text: '저장됨 ✓', color: 'rgba(255,255,255,.9)' }
+    : null
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {deleteConfirm && <DeleteConfirmPopup nick={user?.nick ?? ''} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />}
+      {devRequestOpen && <DevRequestModal onClose={() => setDevRequestOpen(false)} />}
+
       <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'linear-gradient(135deg,var(--pk),var(--mn))', display: 'flex', alignItems: 'center', padding: '0 16px', height: 56, boxShadow: '0 2px 12px rgba(255,107,157,.3)' }}>
         <button onClick={() => setSideOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: '6px 8px 6px 0' }}>☰</button>
         <span style={{ flex: 1, textAlign: 'center', color: '#fff', fontSize: 16, fontWeight: 800 }}>{title}</span>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>
-          {user?.nick}{isAdmin && ' 🔑'}
-        </span>
+        <div style={{ textAlign: 'right', minWidth: 60 }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>
+            {user?.nick}{isAdmin && ' 🔑'}
+          </div>
+          {saveStatus && (
+            <div style={{ fontSize: 10, color: saveStatus.color, lineHeight: 1.3 }}>
+              {saveStatus.text}
+              {!isDirty && lastSavedAt && (
+                <div style={{ fontSize: 9, opacity: .8 }}>{fmtSavedAt(lastSavedAt)}</div>
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       {sideOpen && <div onClick={() => setSideOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,.35)' }} />}
@@ -91,10 +133,17 @@ export default function Layout({ children }: LayoutProps) {
           ))}
           {isAdmin && (
             <button onClick={() => go('/admin')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: location.pathname === '/admin' ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: location.pathname === '/admin' ? 'var(--pk)' : 'var(--text)' }}>
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔧</span>관리자 페이지
+              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔧</span>
+              관리자 페이지
+              {unreadCount > 0 && (
+                <span style={{ marginLeft: 'auto', background: '#e03060', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{unreadCount}</span>
+              )}
             </button>
           )}
           <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />
+          <button onClick={() => { setSideOpen(false); setDevRequestOpen(true) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}>
+            <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>💬</span>개발 요청
+          </button>
           <button onClick={() => { logout(); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>
             <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🚪</span>로그아웃
           </button>
