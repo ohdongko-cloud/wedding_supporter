@@ -279,12 +279,8 @@ export default function BoardPage() {
           <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
             <span>{displayAuthor(post.author)}</span><span>{fmtDate(post.createdAt)}</span><span>조회 {post.views}</span>
           </div>
-          <div
-            style={{ fontSize: 14, lineHeight: 1.85, borderTop: '1px solid var(--gray1)', paddingTop: 14, overflowX: 'auto' }}
-            dangerouslySetInnerHTML={{ __html: post.content }}
-          />
           {post.attachments && post.attachments.length > 0 && (
-            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--gray1)' }}>
+            <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--gray1)' }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>📎 첨부파일 ({post.attachments.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {post.attachments.map((f, i) => (
@@ -299,6 +295,10 @@ export default function BoardPage() {
               </div>
             </div>
           )}
+          <div
+            style={{ fontSize: 14, lineHeight: 1.85, borderTop: '1px solid var(--gray1)', paddingTop: 14, overflowX: 'auto' }}
+            dangerouslySetInnerHTML={{ __html: post.content }}
+          />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--gray1)', flexWrap: 'wrap', gap: 8 }}>
             <button onClick={() => toggleLike(post)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: likedIds.has(post.id) ? 'var(--pk5)' : 'var(--gray1)', color: likedIds.has(post.id) ? 'var(--pk)' : 'var(--text2)', border: 'none', borderRadius: 20, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
