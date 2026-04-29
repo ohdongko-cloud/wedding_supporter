@@ -39,6 +39,22 @@ function calcDeadline(weddingDate: Date, time: string): string | undefined {
   return d.toISOString().slice(0, 10)
 }
 
+function makeDefaultHoneymoonPlan(): import('../types').HoneymoonPlanState {
+  const uid = () => Math.random().toString(36).slice(2)
+  return {
+    budget: 0,
+    days: [{
+      id: uid(), dayNumber: 1, date: '', isOpen: true,
+      items: [
+        { id: uid(), time: '', reserved: false, title: '비행기', detail: '', amount: 0, note: '항공편 정보 입력' },
+        { id: uid(), time: '', reserved: false, title: '숙소', detail: '', amount: 0, note: '체크인 정보 입력' },
+        { id: uid(), time: '', reserved: false, title: '유심', detail: '', amount: 0, note: '현지 유심 또는 포켓와이파이' },
+        { id: uid(), time: '', reserved: false, title: '여행자 보험', detail: '', amount: 0, note: '보험사/증권번호 입력' },
+      ]
+    }]
+  }
+}
+
 export function buildDefaultUserData(nick: string, pinHash: string): UserData {
   // 결혼 예정일: 오늘로부터 정확히 1년 뒤
   const defaultWeddingDate = new Date()
@@ -64,6 +80,7 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
     calcHouse: makeDefaultCalcState(['deposit', 'loan', 'agent', 'moving', 'appliance', 'furniture', 'interior', 'supplies', 'etc']),
     venueName: '',
     memos: [], createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString(),
+    honeymoonPlan: makeDefaultHoneymoonPlan(),
   }
 }
 

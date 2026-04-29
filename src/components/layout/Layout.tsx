@@ -26,21 +26,22 @@ function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConf
 }
 
 const NAV_ITEMS = [
-  { path: '/', label: '메인 페이지', icon: '🏠' },
+  { path: '/', label: '대시보드', icon: '🏠' },
   { path: '/checklist', label: '결혼 체크리스트', icon: '✅' },
   { path: '/board', label: '꿀팁 정보', icon: '📋' },
   { path: '/memo', label: '나만의 메모장', icon: '📝' },
   { path: '/calc/wedding', label: '결혼식 비용 계산기', icon: '💒' },
-  { path: '/calc/honeymoon', label: '신혼여행 비용 계산기', icon: '✈️' },
+  { path: '/honeymoon', label: '신혼여행 계획', icon: '✈️' },
   { path: '/calc/house', label: '신혼집 비용 계산기', icon: '🏡' },
 ]
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': '메인 페이지',
+  '/': '대시보드',
   '/checklist': '결혼 체크리스트',
   '/board': '꿀팁 정보',
   '/memo': '나만의 메모장',
   '/calc/wedding': '결혼식 비용 계산기',
+  '/honeymoon': '신혼여행 계획',
   '/calc/honeymoon': '신혼여행 비용 계산기',
   '/calc/house': '신혼집 비용 계산기',
   '/admin': '관리자 페이지',
@@ -62,7 +63,7 @@ export default function Layout({ children }: LayoutProps) {
   const deleteAccount = useAuthStore(s => s.deleteAccount)
   const isAdmin = user?.nick === 'admin'
   const isGuest = user?.nick === '게스트'
-  const title = PAGE_TITLES[location.pathname] ?? '나만의 결혼 서포터'
+  const title = PAGE_TITLES[location.pathname] ?? '딸깍, 결혼비용 계산기'
 
   useAutoSave()
 
@@ -123,7 +124,7 @@ export default function Layout({ children }: LayoutProps) {
       <nav style={{ position: 'fixed', left: sideOpen ? 0 : -280, top: 0, bottom: 0, width: 280, zIndex: 301, background: '#fff', boxShadow: '4px 0 24px rgba(0,0,0,.12)', transition: 'left .28s cubic-bezier(.4,0,.2,1)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', padding: '24px 20px 20px', color: '#fff' }}>
           <div style={{ fontSize: 20, fontWeight: 800 }}>{user?.nick}{isAdmin && ' 🔑'}</div>
-          <div style={{ fontSize: 12, opacity: .8, marginTop: 4 }}>나만의 결혼 서포터</div>
+          <div style={{ fontSize: 12, opacity: .8, marginTop: 4 }}>딸깍, 결혼비용 계산기</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
           {NAV_ITEMS.map(item => (

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { CHECKLIST_STAGES } from '../data/checklistSeed'
 import { BoardService } from '../services/boardService'
+import { MiniCalendar, WeeklyTasks, MonthTimeline } from '../components/ChecklistWidgets'
+import type { DeadlineItem } from '../components/ChecklistWidgets'
 import type { CalcState, Post } from '../types'
 
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
@@ -43,7 +45,6 @@ export default function DashboardPage() {
   const isGuest = user?.nick === '게스트'
 
   const [weddingDate, setWeddingDate] = useState(userData.weddingDate || '')
-  const [venueName, setVenueName] = useState((userData as any).venueName || '')
   const [dateMode, setDateMode] = useState<'calendar' | 'manual'>('calendar')
   const [saved, setSaved] = useState(false)
   const [guestPopup, setGuestPopup] = useState(false)
@@ -61,17 +62,42 @@ export default function DashboardPage() {
     stg.customItems.forEach(it => { total++; if (it.completed) done++ })
   })
   const pct = total > 0 ? Math.round(done / total * 100) : 0
-  const expected = calcTotal(userData.calcWedding, true) + calcTotal(userData.calcHoneymoon) + calcTotal(userData.calcHouse)
-  const budget = (userData.calcWedding.budget || 0) + (userData.calcHoneymoon.budget || 0) + (userData.calcHouse.budget || 0)
+  const honeymoonTotal = userData.honeymoonPlan
+    ? userData.honeymoonPlan.days.reduce((s, d) => s + d.items.reduce((ss, it) => ss + (it.amount || 0), 0), 0)
+    : calcTotal(userData.calcHoneymoon)
+  const honeymoonBudget = userData.honeymoonPlan?.budget || userData.calcHoneymoon.budget || 0
+  const expected = calcTotal(userData.calcWedding, true) + honeymoonTotal + calcTotal(userData.calcHouse)
+  const budget = (userData.calcWedding.budget || 0) + honeymoonBudget + (userData.calcHouse.budget || 0)
   const diff = budget - expected
 
   const ddayMs = weddingDate ? new Date(weddingDate).getTime() - Date.now() : null
   const dday = ddayMs !== null ? Math.ceil(ddayMs / 86400000) : null
 
+  const deadlineItems: DeadlineItem[] = []
+  CHECKLIST_STAGES.forEach(stage => {
+    const stg = userData.checklist[stage.id]; if (!stg) return
+    stg.items.forEach((it: any) => {
+      if (!it.deadline || it.hidden) return
+      const seed = stage.items.find(s => s.id === it.id); if (!seed) return
+      deadlineItems.push({ stageId: stage.id, itemId: it.id, title: seed.title, deadline: it.deadline, completed: it.completed, isCustom: false, stageName: stage.name })
+    })
+    stg.customItems.forEach((it: any) => {
+      if (!it.deadline) return
+      deadlineItems.push({ stageId: stage.id, itemId: it.id, title: it.title, deadline: it.deadline, completed: it.completed, isCustom: true, stageName: stage.name })
+    })
+  })
+
+  function toggleItem(stageId: string, itemId: string, isCustom: boolean) {
+    const cl = JSON.parse(JSON.stringify(userData.checklist)) as typeof userData.checklist
+    const stg = cl[stageId]
+    if (isCustom) { const it = stg.customItems.find((i: any) => i.id === itemId); if (it) it.completed = !it.completed }
+    else { const it = stg.items.find((i: any) => i.id === itemId); if (it) it.completed = !it.completed }
+    setUserData({ ...userData, checklist: cl }); saveUserData()
+  }
+
   function save() {
     if (isGuest) { setGuestPopup(true); return }
-    const newData = { ...userData, weddingDate, venueName }
-    setUserData(newData)
+    setUserData({ ...userData, weddingDate })
     saveUserData()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -80,7 +106,8 @@ export default function DashboardPage() {
   return (
     <div>
       {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
-      {/* Wedding date + D-DAY + progress */}
+
+      {/* Wedding date + D-DAY */}
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>
         {dday !== null ? (
           <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', marginBottom: 16 }}>
@@ -102,8 +129,6 @@ export default function DashboardPage() {
             <div style={{ fontSize: 15, fontWeight: 700 }}>결혼 예정일을 입력해주세요 💍</div>
           </div>
         )}
-
-        {/* Date input */}
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, opacity: .85, fontWeight: 600 }}>결혼 예정일</span>
@@ -115,44 +140,41 @@ export default function DashboardPage() {
             </button>
           </div>
           {dateMode === 'calendar' ? (
-            <input
-              type='date'
-              value={weddingDate}
-              onChange={e => setWeddingDate(e.target.value)}
-              style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }}
-            />
+            <input type='date' value={weddingDate} onChange={e => setWeddingDate(e.target.value)} style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }} />
           ) : (
-            <input
-              type='text'
-              value={weddingDate}
-              onChange={e => setWeddingDate(e.target.value)}
-              placeholder='YYYY-MM-DD (예: 2026-10-10)'
-              style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }}
-            />
+            <input type='text' value={weddingDate} onChange={e => setWeddingDate(e.target.value)} placeholder='YYYY-MM-DD (예: 2026-10-10)' style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }} />
           )}
         </div>
-
-        {/* Venue name */}
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 12, opacity: .85, fontWeight: 600, marginBottom: 6 }}>결혼식장 이름</div>
-          <input
-            type='text'
-            value={venueName}
-            onChange={e => setVenueName(e.target.value)}
-            placeholder='예: 명동성당 (선택)'
-            style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }}
-          />
-        </div>
-
-        <button
-          onClick={save}
-          style={{ width: '100%', background: saved ? 'rgba(255,255,255,.9)' : '#fff', color: saved ? 'var(--gr)' : 'var(--pk)', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 14, fontWeight: 800, cursor: 'pointer', transition: 'all .2s' }}
-        >
+        <button onClick={save} style={{ width: '100%', background: saved ? 'rgba(255,255,255,.9)' : '#fff', color: saved ? 'var(--gr)' : 'var(--pk)', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 14, fontWeight: 800, cursor: 'pointer', transition: 'all .2s' }}>
           {saved ? '저장되었습니다 ✓' : '저장하기'}
         </button>
       </div>
 
-      {/* Budget summary box */}
+      {/* Checklist progress section */}
+      <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '16px 16px 14px', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.2)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{pct}%</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)', marginTop: 3 }}>{done}개 완료 · 전체 {total}개</div>
+          </div>
+          <div style={{ textAlign: 'right', color: 'rgba(255,255,255,.85)', fontSize: 12 }}>
+            <div style={{ fontSize: 11, marginBottom: 2 }}>남은 항목</div>
+            <div style={{ fontSize: 24, fontWeight: 800 }}>{total - done}개</div>
+          </div>
+        </div>
+        <div style={{ height: 8, background: 'rgba(255,255,255,.25)', borderRadius: 4, marginBottom: 4 }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: '#fff', borderRadius: 4, transition: 'width .5s' }} />
+        </div>
+        <MonthTimeline weddingDate={userData.weddingDate} checklist={userData.checklist} />
+      </div>
+
+      {/* Mini calendar */}
+      <MiniCalendar deadlineItems={deadlineItems} />
+
+      {/* This week's tasks */}
+      <WeeklyTasks deadlineItems={deadlineItems} onToggle={toggleItem} />
+
+      {/* Budget summary */}
       <div style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(102,126,234,.25)' }}>
         <div style={{ fontSize: 13, fontWeight: 700, opacity: .85, marginBottom: 12 }}>예산 현황</div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
@@ -178,7 +200,7 @@ export default function DashboardPage() {
         {[
           { path: '/checklist', icon: '✅', label: '체크리스트', sub: `${pct}% 완료` },
           { path: '/calc/wedding', icon: '💒', label: '결혼식 비용', sub: `${fmt(calcTotal(userData.calcWedding, true))}만원` },
-          { path: '/calc/honeymoon', icon: '✈️', label: '신혼여행 비용', sub: `${fmt(calcTotal(userData.calcHoneymoon))}만원` },
+          { path: '/honeymoon', icon: '✈️', label: '신혼여행 계획', sub: `${fmt(honeymoonTotal)}만원` },
           { path: '/calc/house', icon: '🏡', label: '신혼집 비용', sub: `${fmt(calcTotal(userData.calcHouse))}만원` },
         ].map(q => (
           <button key={q.path} onClick={() => navigate(q.path)} style={{ background: '#fff', border: '1.5px solid var(--pk4)', borderRadius: 14, padding: '14px 12px', textAlign: 'center', cursor: 'pointer', color: 'var(--text)' }}>

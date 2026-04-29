@@ -23,8 +23,8 @@ export default function AuthPage() {
   if (mode === 'splash') return (
     <div style={base}>
       <div style={{ width: 96, height: 96, borderRadius: '50%', border: '3px solid rgba(255,255,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, marginBottom: 16 }}>💍</div>
-      <div style={{ color: '#fff', fontSize: 26, fontWeight: 800, marginBottom: 6 }}>나만의 결혼 서포터</div>
-      <div style={{ color: 'rgba(255,255,255,.75)', fontSize: 13, marginBottom: 40 }}>결혼 준비의 모든 것을 한 곳에서 💕</div>
+      <div style={{ color: '#fff', fontSize: 26, fontWeight: 800, marginBottom: 6 }}>딸깍, 결혼비용 계산기</div>
+      <div style={{ color: 'rgba(255,255,255,.75)', fontSize: 13, marginBottom: 40 }}>예산부터 체크리스트까지 한 번에 관리</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 300 }}>
         <button style={{ background: '#fff', color: 'var(--pk)', border: 'none', borderRadius: 16, padding: '17px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer' }} onClick={() => resetForm('register')}>✨ 처음 시작하기</button>
         <button style={{ background: 'rgba(255,255,255,.2)', color: '#fff', border: '1.5px solid rgba(255,255,255,.4)', borderRadius: 16, padding: '17px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer' }} onClick={() => resetForm('login')}>🔐 저장된 내용 불러오기</button>

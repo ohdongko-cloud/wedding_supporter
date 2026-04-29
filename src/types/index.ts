@@ -48,10 +48,23 @@ export interface HouseDetail {
   jeonse: HouseDetailJeonse
   rent: HouseDetailRent
 }
+export interface HoneymoonScheduleItem {
+  id: string; time: string; reserved: boolean; title: string
+  detail: string; amount: number; note: string
+}
+export interface HoneymoonDay {
+  id: string; dayNumber: number; date: string; isOpen: boolean
+  items: HoneymoonScheduleItem[]
+}
+export interface HoneymoonPlanState {
+  budget: number
+  days: HoneymoonDay[]
+}
 export interface UserData {
   nick: string; pinHash: string; weddingDate: string; totalBudget: number; venueName: string
   checklist: Record<string, ChecklistStageState>
   calcWedding: CalcState; calcHoneymoon: CalcState; calcHouse: CalcState
   memos: Memo[]; createdAt: string; lastLoginAt: string
   houseDetail?: HouseDetail
+  honeymoonPlan?: HoneymoonPlanState
 }
