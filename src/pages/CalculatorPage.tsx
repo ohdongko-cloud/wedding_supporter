@@ -48,8 +48,8 @@ export default function CalculatorPage() {
       if (cat.defItems.length === 0 || hasOldUnits || hasNameMismatch || hasCountMismatch) {
         newCats[catKey] = {
           ...cat,
-          defItems: seedItems.map(([id, name, avg]) => ({
-            id, name, avg, customVal: '', checked: true, deleted: false,
+          defItems: seedItems.map(([id, name, avg, defaultOn]) => ({
+            id, name, avg, customVal: '', checked: defaultOn !== false, deleted: false,
           })),
         }
         changed = true

@@ -196,10 +196,10 @@ const DEFAULT_BUY: HouseDetailBuy = {
 }
 
 const DEFAULT_JEONSE: HouseDetailJeonse = {
-  targetContract: '', region: '', price: '',
+  targetContract: '', region: '경기도 안산시', price: '20000',
   cashGroom: '', cashBride: '', savingsGroom: '', savingsBride: '',
   incomeGroom: '', incomeBride: '',
-  loanRate: '3.0', married: false,
+  loanRate: '3.5', married: false,
 }
 
 const DEFAULT_RENT: HouseDetailRent = {
@@ -209,7 +209,7 @@ const DEFAULT_RENT: HouseDetailRent = {
 }
 
 const DEFAULT_HOUSE_DETAIL: HouseDetail = {
-  mode: 'buy', targetMoveIn: '', address: '',
+  mode: 'jeonse', targetMoveIn: '', address: '경기도 안산시',
   buy: DEFAULT_BUY, jeonse: DEFAULT_JEONSE, rent: DEFAULT_RENT,
 }
 

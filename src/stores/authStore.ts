@@ -11,10 +11,19 @@ export function hashPin(pin: string): string {
 
 type CalcState = import('../types').CalcState
 
-function makeDefaultCalcState(catKeys: string[]): CalcState {
+function makeDefaultCalcState(catKeys: string[], isWedding = false): CalcState {
   const cats: Record<string, import('../types').CalcCategory> = {}
   catKeys.forEach(c => { cats[c] = { defItems: [], customItems: [] } })
-  return { budget: 0, mealCount: 300, mealPrice: 99000, mealCustom: 0, venueHall: '', venueRoom: '', venueDirect: 0, cats, totalCost: 0 }
+  return {
+    budget: 0,
+    mealCount: isWedding ? 200 : 0,
+    mealPrice: isWedding ? 77000 : 99000,
+    mealCustom: 0,
+    venueHall: isWedding ? 'JK아트컨벤션' : '',
+    venueRoom: isWedding ? '아트리움홀' : '',
+    venueDirect: isWedding ? 1000 : 0,
+    cats, totalCost: 0,
+  }
 }
 
 export function buildDefaultUserData(nick: string, pinHash: string): UserData {
@@ -27,7 +36,7 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
   })
   return {
     nick, pinHash, weddingDate: '', totalBudget: 0, checklist,
-    calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'etc']),
+    calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'etc'], true),
     calcHoneymoon: makeDefaultCalcState(['flight', 'accommodation', 'food', 'transport', 'activity', 'shopping', 'insurance', 'etc']),
     calcHouse: makeDefaultCalcState(['deposit', 'loan', 'agent', 'moving', 'appliance', 'furniture', 'interior', 'supplies', 'etc']),
     venueName: '',
