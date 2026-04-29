@@ -55,7 +55,7 @@ function makeDefaultHoneymoonPlan(): import('../types').HoneymoonPlanState {
   }
 }
 
-export function buildDefaultUserData(nick: string, pinHash: string): UserData {
+export function buildDefaultUserData(nick: string, pinHash: string, pinHint?: string): UserData {
   const defaultWeddingDate = new Date()
   defaultWeddingDate.setFullYear(defaultWeddingDate.getFullYear() + 1)
   const weddingDateStr = defaultWeddingDate.toISOString().slice(0, 10)
@@ -71,7 +71,7 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
     }
   })
   return {
-    nick, pinHash, weddingDate: weddingDateStr, totalBudget: 0, checklist,
+    nick, pinHash, pinHint, weddingDate: weddingDateStr, totalBudget: 0, checklist,
     calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'etc'], true),
     calcHoneymoon: makeDefaultCalcState(['flight', 'accommodation', 'food', 'transport', 'activity', 'shopping', 'insurance', 'etc']),
     calcHouse: makeDefaultCalcState(['deposit', 'loan', 'agent', 'moving', 'appliance', 'furniture', 'interior', 'supplies', 'etc']),
@@ -79,6 +79,7 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
     memos: [], createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString(),
     honeymoonPlan: makeDefaultHoneymoonPlan(),
     hasSeenTour: false,
+    hasSeenOnboarding: false,
   }
 }
 
@@ -108,7 +109,7 @@ interface AuthState {
   isSaving: boolean
   isLoading: boolean
   login: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string }>
-  register: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string }>
+  register: (nick: string, pin: string, pinHint?: string) => Promise<{ ok: boolean; error?: string }>
   loginAnon: () => void
   logout: () => void
   saveUserData: () => Promise<'saved' | 'conflict' | 'error'>
@@ -121,9 +122,11 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null, userData: null, isDirty: false, localUpdatedAt: null, isSaving: false, isLoading: false,
+  user: { nick: '게스트', pinHash: '' },
+  userData: buildDefaultUserData('게스트', ''),
+  isDirty: false, localUpdatedAt: null, isSaving: false, isLoading: false,
 
-  async register(nick, pin) {
+  async register(nick, pin, pinHint) {
     if (nick.trim().length < 2) return { ok: false, error: '닉네임은 2자 이상 입력해주세요.' }
     if (nick.toLowerCase() === 'admin') return { ok: false, error: '사용할 수 없는 닉네임이에요.' }
     if (pin.length < 6) return { ok: false, error: '비밀번호 6자리를 모두 입력해주세요.' }
@@ -137,7 +140,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     const ph = hashPin(pin)
-    const userData = buildDefaultUserData(nick, ph)
+    const userData = buildDefaultUserData(nick, ph, pinHint?.trim() || undefined)
     const now = new Date().toISOString()
     StorageService.set(userKey(nick), userData)
     StorageService.addToRegistry(nick)
@@ -155,7 +158,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (supabase) {
       const { data: row } = await supabase.from('users').select('pin_hash, data, updated_at').eq('nick', nick.toLowerCase()).maybeSingle()
       if (row) {
-        if (row.pin_hash !== ph) { set({ isLoading: false }); return { ok: false, error: '비밀번호가 일치하지 않아요.' } }
+        if (row.pin_hash !== ph) {
+          set({ isLoading: false })
+          const hint = (row.data as UserData)?.pinHint
+          return { ok: false, error: hint ? `비밀번호가 일치하지 않아요.\n힌트: ${hint}` : '비밀번호가 일치하지 않아요.' }
+        }
         const userData = row.data as UserData
         userData.lastLoginAt = new Date().toISOString()
         StorageService.set(userKey(nick), userData)
@@ -167,7 +174,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const saved = StorageService.get<UserData>(userKey(nick))
     if (!saved) { set({ isLoading: false }); return { ok: false, error: '저장된 데이터가 없어요.' } }
-    if (saved.pinHash !== ph) { set({ isLoading: false }); return { ok: false, error: '비밀번호가 일치하지 않아요.' } }
+    if (saved.pinHash !== ph) {
+      set({ isLoading: false })
+      const hint = saved.pinHint
+      return { ok: false, error: hint ? `비밀번호가 일치하지 않아요.\n힌트: ${hint}` : '비밀번호가 일치하지 않아요.' }
+    }
     saved.lastLoginAt = new Date().toISOString()
     StorageService.set(userKey(nick), saved)
     StorageService.addToRegistry(nick)
@@ -181,7 +192,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
   },
 
-  logout() { set({ user: null, userData: null, isDirty: false, localUpdatedAt: null }) },
+  logout() { set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null }) },
 
   async saveUserData() {
     const { user, userData, localUpdatedAt } = get()

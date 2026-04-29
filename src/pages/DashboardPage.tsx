@@ -7,6 +7,7 @@ import { MiniCalendar, WeeklyTasks, MonthTimeline } from '../components/Checklis
 import type { DeadlineItem } from '../components/ChecklistWidgets'
 import type { CalcState, Post } from '../types'
 import TourOverlay from '../components/onboarding/TourOverlay'
+import OnboardingWizard from '../components/OnboardingWizard'
 
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
 
@@ -51,6 +52,7 @@ export default function DashboardPage() {
   const [guestPopup, setGuestPopup] = useState(false)
   const [recentPosts, setRecentPosts] = useState<Post[]>([])
   const [showTour, setShowTour] = useState(false)
+  const showOnboarding = !isGuest && userData.hasSeenOnboarding === false
 
   useEffect(() => {
     const posts = BoardService.getPosts()
@@ -59,6 +61,18 @@ export default function DashboardPage() {
 
   const GUEST_SKIP_KEY = 'ws_guest_tour_skip'
   const GUEST_SEEN_KEY = 'ws_guest_tour_seen'
+
+  function completeOnboarding(date: string, budget: number) {
+    const updated = {
+      ...userData,
+      weddingDate: date || userData.weddingDate,
+      calcWedding: { ...userData.calcWedding, budget: budget || userData.calcWedding.budget },
+      hasSeenOnboarding: true,
+    }
+    setWeddingDate(date || userData.weddingDate)
+    setUserData(updated)
+    saveUserData()
+  }
 
   useEffect(() => {
     if (!isGuest && userData.hasSeenTour === false) {
@@ -141,7 +155,8 @@ export default function DashboardPage() {
   return (
     <div>
       {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
-      {showTour && <TourOverlay onComplete={completeTour} onSkipWeek={isGuest ? skipTourWeek : undefined} />}
+      {showOnboarding && <OnboardingWizard nick={userData.nick} onComplete={completeOnboarding} />}
+      {!showOnboarding && showTour && <TourOverlay onComplete={completeTour} onSkipWeek={isGuest ? skipTourWeek : undefined} />}
 
       {/* Wedding date + D-DAY */}
       <div data-tour="wedding-date" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>

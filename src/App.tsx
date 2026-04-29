@@ -14,16 +14,9 @@ import MemoPage from './pages/MemoPage'
 import AdminPage from './pages/AdminPage'
 import SharedViewPage from './pages/SharedViewPage'
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore(s => s.user)
-  if (!user) return <Navigate to='/auth' replace />
-  return <>{children}</>
-}
-
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
-  if (!user) return <Navigate to='/auth' replace />
-  if (user.nick !== 'admin') return <Navigate to='/' replace />
+  if (!user || user.nick !== 'admin') return <Navigate to='/' replace />
   return <>{children}</>
 }
 
@@ -34,10 +27,9 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path='/auth' element={user ? <Navigate to='/' replace /> : <AuthPage />} />
+      <Route path='/auth' element={(user && user.nick !== '게스트') ? <Navigate to='/' replace /> : <AuthPage />} />
       <Route path='/view/:shareToken' element={<SharedViewPage />} />
       <Route path='/*' element={
-        <ProtectedRoute>
           <Layout>
             <Routes>
               <Route path='/' element={<DashboardPage />} />
@@ -51,7 +43,6 @@ export default function App() {
               <Route path='*' element={<Navigate to='/' replace />} />
             </Routes>
           </Layout>
-        </ProtectedRoute>
       } />
     </Routes>
   )

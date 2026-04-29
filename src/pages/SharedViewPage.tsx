@@ -130,6 +130,25 @@ function ReadOnlyDashboard({ data }: { data: UserData }) {
   )
 }
 
+function StartCTA() {
+  const navigate = useNavigate()
+  return (
+    <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 16, padding: '24px 22px', marginTop: 20, textAlign: 'center', color: '#fff' }}>
+      <div style={{ fontSize: 28, marginBottom: 10 }}>💍</div>
+      <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>나도 결혼 준비 시작하기</div>
+      <div style={{ fontSize: 13, opacity: .85, lineHeight: 1.7, marginBottom: 18 }}>
+        체크리스트·비용 계산기·메모장을<br />무료로 사용할 수 있어요.
+      </div>
+      <button
+        onClick={() => navigate('/auth')}
+        style={{ background: '#fff', color: 'var(--pk)', border: 'none', borderRadius: 12, padding: '14px 32px', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 20px rgba(0,0,0,.15)' }}
+      >
+        무료로 시작하기 →
+      </button>
+    </div>
+  )
+}
+
 export default function SharedViewPage() {
   const { shareToken } = useParams<{ shareToken: string }>()
   const navigate = useNavigate()
@@ -184,6 +203,7 @@ export default function SharedViewPage() {
       <main style={{ maxWidth: 960, margin: '0 auto', padding: '20px 16px 60px' }}>
         <ViewModeBanner ownerNick={ownerNick} createdAt={createdAt} />
         <ReadOnlyDashboard data={data} />
+        <StartCTA />
       </main>
     </div>
   )

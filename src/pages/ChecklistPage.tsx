@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { CHECKLIST_STAGES } from '../data/checklistSeed'
 import { AnalyticsService } from '../services/analytics'
 import { MiniCalendar, WeeklyTasks, MonthTimeline, getDDayLabel } from '../components/ChecklistWidgets'
 import type { DeadlineItem } from '../components/ChecklistWidgets'
 import type { ChecklistSeedItem } from '../types'
+import ConfettiCelebration from '../components/ConfettiCelebration'
 
 export default function ChecklistPage() {
   const userData = useAuthStore(s => s.userData)!
@@ -12,6 +13,8 @@ export default function ChecklistPage() {
   const saveUserData = useAuthStore(s => s.saveUserData)
   const [openStages, setOpenStages] = useState<Record<string, boolean>>({})
   const [dateMode, setDateMode] = useState<'calendar' | 'text'>('calendar')
+  const [showConfetti, setShowConfetti] = useState(false)
+  const prevPct = useRef<number | null>(null)
 
   useEffect(() => {
     const cl = JSON.parse(JSON.stringify(userData.checklist)) as typeof userData.checklist
@@ -42,6 +45,13 @@ export default function ChecklistPage() {
     stg.customItems.forEach(it => { total++; if (it.completed) done++ })
   })
   const pct = total > 0 ? Math.round(done / total * 100) : 0
+
+  useEffect(() => {
+    if (prevPct.current !== null && prevPct.current < 100 && pct === 100 && total > 0) {
+      setShowConfetti(true)
+    }
+    prevPct.current = pct
+  }, [pct, total])
 
   const deadlineItems: DeadlineItem[] = []
   CHECKLIST_STAGES.forEach(stage => {
@@ -108,6 +118,7 @@ export default function ChecklistPage() {
 
   return (
     <div>
+      {showConfetti && <ConfettiCelebration onClose={() => setShowConfetti(false)} />}
       {/* Header with timeline */}
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '16px 16px 14px', marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

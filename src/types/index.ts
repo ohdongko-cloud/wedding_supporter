@@ -61,13 +61,14 @@ export interface HoneymoonPlanState {
   days: HoneymoonDay[]
 }
 export interface UserData {
-  nick: string; pinHash: string; weddingDate: string; totalBudget: number; venueName: string
+  nick: string; pinHash: string; pinHint?: string; weddingDate: string; totalBudget: number; venueName: string
   checklist: Record<string, ChecklistStageState>
   calcWedding: CalcState; calcHoneymoon: CalcState; calcHouse: CalcState
   memos: Memo[]; createdAt: string; lastLoginAt: string
   houseDetail?: HouseDetail
   honeymoonPlan?: HoneymoonPlanState
   hasSeenTour?: boolean
+  hasSeenOnboarding?: boolean
 }
 export interface SharedSnapshot {
   share_token: string

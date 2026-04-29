@@ -159,7 +159,7 @@ export default function TourOverlay({ onComplete, onSkipWeek }: Props) {
           </div>
         ) : (
           <button onClick={onComplete} style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', opacity: .7 }}>
-            투어 건너뛰기
+            건너뛰기
           </button>
         )}
       </div>

@@ -8,6 +8,7 @@ import DevRequestModal from '../DevRequestModal'
 import LeaveConfirmModal from '../LeaveConfirmModal'
 import ConflictModal from '../ConflictModal'
 import ShareModal from '../ShareModal'
+import PartnerInviteModal from '../PartnerInviteModal'
 
 function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConfirm: () => void; onClose: () => void }) {
   return (
@@ -28,25 +29,25 @@ function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConf
   )
 }
 
-const NAV_ITEMS = [
-  { path: '/', label: '대시보드', icon: '🏠' },
+const NAV_ITEMS: ({ path: string; label: string; icon: string; dividerAfter?: boolean })[] = [
+  { path: '/', label: '홈', icon: '🏠' },
   { path: '/checklist', label: '전체 일정관리', icon: '✅' },
-  { path: '/board', label: '꿀팁 정보', icon: '📋' },
-  { path: '/memo', label: '나만의 메모장', icon: '📝' },
   { path: '/calc/wedding', label: '결혼식 비용 계산기', icon: '💒' },
-  { path: '/honeymoon', label: '신혼여행 계획', icon: '✈️' },
-  { path: '/calc/house', label: '신혼집 마련 계획', icon: '🏡' },
+  { path: '/honeymoon', label: '신혼여행 관리', icon: '✈️' },
+  { path: '/calc/house', label: '신혼집 마련', icon: '🏡', dividerAfter: true },
+  { path: '/board', label: '공개 게시판', icon: '📋' },
+  { path: '/memo', label: '내 메모장', icon: '📝' },
 ]
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': '대시보드',
+  '/': '홈',
   '/checklist': '전체 일정관리',
-  '/board': '꿀팁 정보',
-  '/memo': '나만의 메모장',
+  '/board': '공개 게시판',
+  '/memo': '내 메모장',
   '/calc/wedding': '결혼식 비용 계산기',
-  '/honeymoon': '신혼여행 계획',
+  '/honeymoon': '신혼여행 관리',
   '/calc/honeymoon': '신혼여행 비용 계산기',
-  '/calc/house': '신혼집 마련 계획',
+  '/calc/house': '신혼집 마련',
   '/admin': '관리자 페이지',
 }
 
@@ -62,6 +63,7 @@ export default function Layout({ children }: LayoutProps) {
   const [shareModal, setShareModal] = useState(false)
   const [shareUrl, setShareUrl] = useState('')
   const [shareLoading, setShareLoading] = useState(false)
+  const [partnerModal, setPartnerModal] = useState(false)
   const pendingPath = useRef<string | null>(null)
 
   const location = useLocation()
@@ -178,26 +180,28 @@ export default function Layout({ children }: LayoutProps) {
       {leaveModal && <LeaveConfirmModal onSave={handleLeaveSave} onDiscard={handleLeaveDiscard} onCancel={handleLeaveCancel} />}
       {conflictModal && <ConflictModal onOverwrite={handleConflictOverwrite} onLoadServer={handleConflictLoadServer} />}
       {shareModal && <ShareModal shareUrl={shareUrl} onClose={() => setShareModal(false)} />}
+      {partnerModal && user && <PartnerInviteModal nick={user.nick} onClose={() => setPartnerModal(false)} />}
 
       <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'linear-gradient(135deg,var(--pk),var(--mn))', display: 'flex', alignItems: 'center', padding: '0 16px', height: 56, boxShadow: '0 2px 12px rgba(255,107,157,.3)' }}>
         <button data-tour="menu-button" onClick={() => setSideOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: '6px 8px 6px 0' }}>☰</button>
         <span style={{ flex: 1, textAlign: 'center', color: '#fff', fontSize: 16, fontWeight: 800 }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {!isGuest && (
+          {isGuest ? (
+            <button
+              onClick={() => navigate('/auth')}
+              style={{ background: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.5)', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              🔐 로그인
+            </button>
+          ) : (
             <button
               onClick={handleSave}
               disabled={isSaving || !isDirty}
               style={{
                 background: isDirty ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.1)',
                 border: `1px solid ${isDirty ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.25)'}`,
-                color: '#fff',
-                borderRadius: 8,
-                padding: '5px 10px',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: isDirty && !isSaving ? 'pointer' : 'default',
-                transition: 'all .2s',
-                whiteSpace: 'nowrap',
+                color: '#fff', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700,
+                cursor: isDirty && !isSaving ? 'pointer' : 'default', transition: 'all .2s', whiteSpace: 'nowrap',
               }}
             >
               {isSaving ? '저장 중...' : isDirty ? '💾 저장' : localUpdatedAt ? `✓ ${fmtSavedAt(localUpdatedAt)}` : '저장됨'}
@@ -205,7 +209,7 @@ export default function Layout({ children }: LayoutProps) {
           )}
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>
-              {user?.nick}{isAdmin && ' 🔑'}
+              {isGuest ? '게스트' : `${user?.nick}${isAdmin ? ' 🔑' : ''}`}
             </div>
           </div>
         </div>
@@ -220,9 +224,12 @@ export default function Layout({ children }: LayoutProps) {
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
           {NAV_ITEMS.map(item => (
-            <button key={item.path} onClick={() => go(item.path)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: location.pathname === item.path ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: location.pathname === item.path ? 'var(--pk)' : 'var(--text)' }}>
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{item.icon}</span>{item.label}
-            </button>
+            <div key={item.path}>
+              <button onClick={() => go(item.path)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: location.pathname === item.path ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: location.pathname === item.path ? 'var(--pk)' : 'var(--text)' }}>
+                <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{item.icon}</span>{item.label}
+              </button>
+              {item.dividerAfter && <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />}
+            </div>
           ))}
           {isAdmin && (
             <button onClick={() => go('/admin')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: location.pathname === '/admin' ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: location.pathname === '/admin' ? 'var(--pk)' : 'var(--text)' }}>
@@ -235,21 +242,36 @@ export default function Layout({ children }: LayoutProps) {
           )}
           <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />
           {!isGuest && (
-            <button
-              onClick={handleShare}
-              disabled={shareLoading}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}
-            >
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔗</span>
-              {shareLoading ? '링크 생성 중...' : '결과 공유하기'}
-            </button>
+            <>
+              <button
+                onClick={() => { setSideOpen(false); setPartnerModal(true) }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}
+              >
+                <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>👫</span>
+                파트너와 함께 사용하기
+              </button>
+              <button
+                onClick={handleShare}
+                disabled={shareLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}
+              >
+                <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔗</span>
+                {shareLoading ? '링크 생성 중...' : '결과 공유하기'}
+              </button>
+            </>
           )}
           <button onClick={() => { setSideOpen(false); setDevRequestOpen(true) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}>
             <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>💬</span>개발 요청
           </button>
-          <button onClick={() => { logout(); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>
-            <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🚪</span>로그아웃
-          </button>
+          {isGuest ? (
+            <button onClick={() => { setSideOpen(false); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: 'var(--pk)' }}>
+              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔐</span>로그인 / 회원가입
+            </button>
+          ) : (
+            <button onClick={() => { logout(); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>
+              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🚪</span>로그아웃
+            </button>
+          )}
           {!isGuest && !isAdmin && (
             <button onClick={() => setDeleteConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#e03060' }}>
               <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🗑️</span>초기화 및 삭제

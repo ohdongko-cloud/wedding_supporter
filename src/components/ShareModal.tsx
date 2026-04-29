@@ -18,6 +18,14 @@ export default function ShareModal({ shareUrl, onClose }: Props) {
     }
   }
 
+  const canNativeShare = typeof navigator.share === 'function'
+
+  async function nativeShare() {
+    try {
+      await navigator.share({ title: '결혼 준비 현황 공유', text: '내 결혼 준비 현황을 확인해보세요 💍', url: shareUrl })
+    } catch { /* user cancelled */ }
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
       <div style={{ background: '#fff', borderRadius: 20, padding: '24px 22px', width: 310, boxShadow: '0 20px 60px rgba(0,0,0,.2)' }} onClick={e => e.stopPropagation()}>
@@ -29,9 +37,17 @@ export default function ShareModal({ shareUrl, onClose }: Props) {
         <div style={{ background: 'var(--pk5)', borderRadius: 10, padding: '10px 12px', marginBottom: 14, wordBreak: 'break-all', fontSize: 11, color: 'var(--text2)' }}>
           {shareUrl}
         </div>
+        {canNativeShare && (
+          <button
+            onClick={nativeShare}
+            style={{ width: '100%', background: 'linear-gradient(135deg,#25d366,#128c7e)', color: '#fff', border: 'none', borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}
+          >
+            📤 카카오·문자·SNS로 공유
+          </button>
+        )}
         <button
           onClick={copyLink}
-          style={{ width: '100%', background: copied ? 'var(--gr)' : 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'background .2s', marginBottom: 8 }}
+          style={{ width: '100%', background: copied ? '#22c55e' : 'var(--pk)', color: '#fff', border: 'none', borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'background .2s', marginBottom: 8 }}
         >
           {copied ? '✅ 링크가 복사됐어요!' : '🔗 링크 복사'}
         </button>
