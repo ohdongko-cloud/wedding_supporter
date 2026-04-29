@@ -26,16 +26,39 @@ function makeDefaultCalcState(catKeys: string[], isWedding = false): CalcState {
   }
 }
 
+// time 필드(D-300, D+7, D-day 등)를 기준으로 마감일 계산
+function calcDeadline(weddingDate: Date, time: string): string | undefined {
+  if (!time) return undefined
+  if (time === 'D-day') return weddingDate.toISOString().slice(0, 10)
+  const match = time.match(/^D([+-])(\d+)$/)
+  if (!match) return undefined
+  const sign = match[1] === '+' ? 1 : -1
+  const days = parseInt(match[2])
+  const d = new Date(weddingDate)
+  d.setDate(d.getDate() + sign * days)
+  return d.toISOString().slice(0, 10)
+}
+
 export function buildDefaultUserData(nick: string, pinHash: string): UserData {
+  // 결혼 예정일: 오늘로부터 정확히 1년 뒤
+  const defaultWeddingDate = new Date()
+  defaultWeddingDate.setFullYear(defaultWeddingDate.getFullYear() + 1)
+  const weddingDateStr = defaultWeddingDate.toISOString().slice(0, 10)
+
   const checklist: UserData['checklist'] = {}
   CHECKLIST_STAGES.forEach(s => {
     checklist[s.id] = {
-      items: s.items.map(it => ({ id: it.id, completed: false, hidden: false })),
+      items: s.items.map(it => ({
+        id: it.id,
+        completed: false,
+        hidden: false,
+        deadline: it.time ? calcDeadline(defaultWeddingDate, it.time) : undefined,
+      })),
       customItems: [],
     }
   })
   return {
-    nick, pinHash, weddingDate: '', totalBudget: 0, checklist,
+    nick, pinHash, weddingDate: weddingDateStr, totalBudget: 0, checklist,
     calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'etc'], true),
     calcHoneymoon: makeDefaultCalcState(['flight', 'accommodation', 'food', 'transport', 'activity', 'shopping', 'insurance', 'etc']),
     calcHouse: makeDefaultCalcState(['deposit', 'loan', 'agent', 'moving', 'appliance', 'furniture', 'interior', 'supplies', 'etc']),
