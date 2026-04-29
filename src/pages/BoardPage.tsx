@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { BoardService } from '../services/boardService'
 import type { Post, PostAttachment } from '../types'
 import RichEditor from '../components/RichEditor'
+
+declare global { interface Window { Kakao: any } }
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3MB
 
@@ -40,6 +43,7 @@ function displayAuthor(nick: string) { return nick === 'admin' ? '주인장' : n
 export default function BoardPage() {
   const user = useAuthStore(s => s.user)!
   const isAdmin = user.nick === 'admin'
+  const location = useLocation()
   const [view, setView] = useState<View>('list')
   const [posts, setPosts] = useState<Post[]>([])
   const [selected, setSelected] = useState<Post | null>(null)
@@ -54,8 +58,24 @@ export default function BoardPage() {
   const [attachments, setAttachments] = useState<PostAttachment[]>([])
   const [fileError, setFileError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [shareToast, setShareToast] = useState('')
 
-  useEffect(() => { setPosts(BoardService.getPosts()) }, [])
+  useEffect(() => {
+    const allPosts = BoardService.getPosts()
+    setPosts(allPosts)
+    // URL ?post=ID 직링크 처리
+    const params = new URLSearchParams(location.search)
+    const postId = params.get('post')
+    if (postId) {
+      const target = allPosts.find(p => p.id === postId)
+      if (target) {
+        BoardService.incrementView(postId)
+        const updated = BoardService.getPost(postId)
+        setSelected(updated ?? target)
+        setView('detail')
+      }
+    }
+  }, []) // eslint-disable-line
 
   function reload() { setPosts(BoardService.getPosts()) }
 
@@ -124,6 +144,52 @@ export default function BoardPage() {
 
   function removeAttachment(idx: number) {
     setAttachments(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function showToast(msg: string) {
+    setShareToast(msg)
+    setTimeout(() => setShareToast(''), 2200)
+  }
+
+  function getShareUrl(postId: string) {
+    const base = window.location.origin + window.location.pathname
+    return `${base}?post=${postId}`
+  }
+
+  async function copyLink(postId: string) {
+    const url = getShareUrl(postId)
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast('링크가 복사됐어요! 📋')
+    } catch {
+      showToast(url)
+    }
+  }
+
+  function shareKakao(post: Post) {
+    const url = getShareUrl(post.id)
+    const kakao = window.Kakao
+    if (kakao && kakao.isInitialized?.()) {
+      kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: post.title,
+          description: '딸깍, 결혼비용 계산기 게시판',
+          imageUrl: `${window.location.origin}/icon-192.png`,
+          link: { mobileWebUrl: url, webUrl: url },
+        },
+        buttons: [{ title: '게시글 보기', link: { mobileWebUrl: url, webUrl: url } }],
+      })
+      return
+    }
+    // Kakao SDK 미설정 시 Web Share API 사용 (모바일 기본 공유)
+    if (navigator.share) {
+      navigator.share({ title: post.title, text: '딸깍, 결혼비용 계산기 게시판', url })
+        .catch(() => {})
+    } else {
+      copyLink(post.id)
+      showToast('링크 복사됨 — 카카오톡에 붙여넣기 해주세요 📋')
+    }
   }
 
   const filtered = posts.filter(p => p.title.includes(search) || p.author.includes(search))
@@ -196,7 +262,12 @@ export default function BoardPage() {
     const post = BoardService.getPost(selected.id) ?? selected
     const isOwner = post.author === user.nick || isAdmin
     return (
-      <div>
+      <div style={{ position: 'relative' }}>
+        {shareToast && (
+          <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.78)', color: '#fff', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 600, zIndex: 9999, whiteSpace: 'nowrap', maxWidth: '90vw', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {shareToast}
+          </div>
+        )}
         <button onClick={() => { setView('list'); reload() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--pk)', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>← 목록으로</button>
         <div style={{ background: '#fff', borderRadius: 14, padding: '20px', boxShadow: '0 4px 20px rgba(255,107,157,.1)', border: '1.5px solid var(--pk4)', marginBottom: 12 }}>
           {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, marginRight: 8 }}>공지</span>}
@@ -225,16 +296,25 @@ export default function BoardPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--gray1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--gray1)', flexWrap: 'wrap', gap: 8 }}>
             <button onClick={() => toggleLike(post)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: likedIds.has(post.id) ? 'var(--pk5)' : 'var(--gray1)', color: likedIds.has(post.id) ? 'var(--pk)' : 'var(--text2)', border: 'none', borderRadius: 20, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
               ❤️ {post.likes}
             </button>
-            {isOwner && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => openEdit(post)} style={{ background: 'none', border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>수정</button>
-                <button onClick={() => deletePost(post.id)} style={{ background: 'none', border: '1.5px solid #ffcdd2', borderRadius: 8, padding: '6px 14px', fontSize: 13, cursor: 'pointer', color: '#e57373', fontWeight: 600 }}>삭제</button>
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {/* 공유 버튼 */}
+              <button onClick={() => copyLink(post.id)} title="링크 복사" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--gray1)', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: 'var(--text2)' }}>
+                🔗 링크 복사
+              </button>
+              <button onClick={() => shareKakao(post)} title="카카오톡 공유" style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#FEE500', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#3C1E1E' }}>
+                💬 카카오 공유
+              </button>
+              {isOwner && (
+                <>
+                  <button onClick={() => openEdit(post)} style={{ background: 'none', border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>수정</button>
+                  <button onClick={() => deletePost(post.id)} style={{ background: 'none', border: '1.5px solid #ffcdd2', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', color: '#e57373', fontWeight: 600 }}>삭제</button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

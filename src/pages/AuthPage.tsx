@@ -15,10 +15,44 @@ export default function AuthPage() {
   const isAdmin = nick.trim().toLowerCase() === 'admin'
   const pin = isAdmin ? adminPw : pins.join('')
 
+  async function doSubmit(pinVal: string) {
+    if (loading) return
+    if (!nick.trim()) { setError('닉네임을 입력해주세요.'); return }
+    if (isAdmin && !adminPw) { setError('관리자 비밀번호를 입력해주세요.'); return }
+    if (!isAdmin && pinVal.length < 6) { setError('비밀번호 6자리를 모두 입력해주세요.'); return }
+
+    setError('')
+    setLoading(true)
+
+    const loginRes = await login(nick.trim(), pinVal)
+    if (loginRes.ok) { navigate('/'); return }
+
+    if (loginRes.error?.includes('저장된 데이터가 없어요')) {
+      const regRes = await register(nick.trim(), pinVal)
+      setLoading(false)
+      if (regRes.ok) navigate('/')
+      else setError(regRes.error ?? '')
+      return
+    }
+
+    setLoading(false)
+    setError(loginRes.error ?? '')
+  }
+
+  function handleSmartSubmit() { doSubmit(pin) }
+
   function handlePinChange(i: number, val: string) {
     const v = val.replace(/\D/, '').slice(0, 1)
     const next = [...pins]; next[i] = v; setPins(next)
-    if (v && i < 5) pinRefs.current[i + 1]?.focus()
+    if (v && i < 5) {
+      pinRefs.current[i + 1]?.focus()
+    } else if (v && i === 5) {
+      // 마지막 자리 입력 시 자동 로그인
+      const fullPin = next.join('')
+      if (nick.trim().length >= 2 && fullPin.length === 6) {
+        doSubmit(fullPin)
+      }
+    }
   }
   function handlePinKey(i: number, e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Backspace' && !pins[i] && i > 0) pinRefs.current[i - 1]?.focus()
@@ -29,32 +63,12 @@ export default function AuthPage() {
     const next = Array(6).fill('')
     text.split('').forEach((c, i) => { next[i] = c })
     setPins(next)
+    const fullPin = next.join('')
     pinRefs.current[Math.min(text.length, 5)]?.focus()
-  }
-
-  async function handleSmartSubmit() {
-    if (loading) return
-    if (!nick.trim()) { setError('닉네임을 입력해주세요.'); return }
-    if (isAdmin && !adminPw) { setError('관리자 비밀번호를 입력해주세요.'); return }
-    if (!isAdmin && pin.length < 6) { setError('비밀번호 6자리를 모두 입력해주세요.'); return }
-
-    setError('')
-    setLoading(true)
-
-    // Try login first — if nick doesn't exist, auto-register
-    const loginRes = await login(nick.trim(), pin)
-    if (loginRes.ok) { navigate('/'); return }
-
-    if (loginRes.error?.includes('저장된 데이터가 없어요')) {
-      const regRes = await register(nick.trim(), pin)
-      setLoading(false)
-      if (regRes.ok) navigate('/')
-      else setError(regRes.error ?? '')
-      return
+    // 6자리 붙여넣기 시 자동 로그인
+    if (nick.trim().length >= 2 && fullPin.length === 6) {
+      setTimeout(() => doSubmit(fullPin), 50)
     }
-
-    setLoading(false)
-    setError(loginRes.error ?? '')
   }
 
   const pinFilled = pins.filter(Boolean).length
@@ -152,7 +166,7 @@ export default function AuthPage() {
             marginBottom: 10,
           }}
         >
-          {loading ? '잠시만요...' : '⚡ 5초 간편가입'}
+          {loading ? '잠시만요...' : '⚡ 로그인 / 가입하기'}
         </button>
 
         <button
@@ -167,8 +181,8 @@ export default function AuthPage() {
         </button>
 
         <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.6 }}>
-          처음이면 자동으로 가입돼요 🙂<br />
-          <span style={{ opacity: .65 }}>기존 계정이면 그대로 로그인 됩니다</span>
+          기존 계정이면 비밀번호 입력 즉시 로그인 🙂<br />
+          <span style={{ opacity: .65 }}>처음이면 자동으로 가입됩니다</span>
         </div>
       </div>
     </div>
