@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore, seedAdminUser } from './stores/authStore'
+import { BoardService } from './services/boardService'
 import AuthPage from './pages/AuthPage'
 import Layout from './components/layout/Layout'
 import DashboardPage from './pages/DashboardPage'
@@ -28,7 +29,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const user = useAuthStore(s => s.user)
 
-  useEffect(() => { seedAdminUser() }, [])
+  useEffect(() => { seedAdminUser(); BoardService.seedNotice() }, [])
 
   return (
     <Routes>

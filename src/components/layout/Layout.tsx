@@ -27,23 +27,23 @@ function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConf
 
 const NAV_ITEMS = [
   { path: '/', label: '대시보드', icon: '🏠' },
-  { path: '/checklist', label: '결혼 체크리스트', icon: '✅' },
+  { path: '/checklist', label: '전체 일정관리', icon: '✅' },
   { path: '/board', label: '꿀팁 정보', icon: '📋' },
   { path: '/memo', label: '나만의 메모장', icon: '📝' },
   { path: '/calc/wedding', label: '결혼식 비용 계산기', icon: '💒' },
   { path: '/honeymoon', label: '신혼여행 계획', icon: '✈️' },
-  { path: '/calc/house', label: '신혼집 비용 계산기', icon: '🏡' },
+  { path: '/calc/house', label: '신혼집 마련 계획', icon: '🏡' },
 ]
 
 const PAGE_TITLES: Record<string, string> = {
   '/': '대시보드',
-  '/checklist': '결혼 체크리스트',
+  '/checklist': '전체 일정관리',
   '/board': '꿀팁 정보',
   '/memo': '나만의 메모장',
   '/calc/wedding': '결혼식 비용 계산기',
   '/honeymoon': '신혼여행 계획',
   '/calc/honeymoon': '신혼여행 비용 계산기',
-  '/calc/house': '신혼집 비용 계산기',
+  '/calc/house': '신혼집 마련 계획',
   '/admin': '관리자 페이지',
 }
 

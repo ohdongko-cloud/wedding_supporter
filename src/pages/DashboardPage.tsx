@@ -230,10 +230,10 @@ export default function DashboardPage() {
       {/* Quick navigation */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
         {[
-          { path: '/checklist', icon: '✅', label: '체크리스트', sub: `${pct}% 완료`, tour: 'nav-checklist' },
-          { path: '/calc/wedding', icon: '💒', label: '결혼식 비용', sub: `${fmt(calcTotal(userData.calcWedding, true))}만원`, tour: 'nav-wedding' },
+          { path: '/checklist', icon: '✅', label: '전체 일정관리', sub: `${pct}% 완료`, tour: 'nav-checklist' },
+          { path: '/calc/wedding', icon: '💒', label: '결혼식 비용 계산기', sub: `${fmt(calcTotal(userData.calcWedding, true))}만원`, tour: 'nav-wedding' },
           { path: '/honeymoon', icon: '✈️', label: '신혼여행 계획', sub: `${fmt(honeymoonTotal)}만원`, tour: undefined },
-          { path: '/calc/house', icon: '🏡', label: '신혼집 비용', sub: `${fmt(calcTotal(userData.calcHouse))}만원`, tour: undefined },
+          { path: '/calc/house', icon: '🏡', label: '신혼집 마련 계획', sub: `${fmt(calcTotal(userData.calcHouse))}만원`, tour: undefined },
         ].map(q => (
           <button key={q.path} data-tour={q.tour} onClick={() => navigate(q.path)} style={{ background: '#fff', border: '1.5px solid var(--pk4)', borderRadius: 14, padding: '14px 12px', textAlign: 'center', cursor: 'pointer', color: 'var(--text)' }}>
             <span style={{ fontSize: 24, display: 'block', marginBottom: 4 }}>{q.icon}</span>
