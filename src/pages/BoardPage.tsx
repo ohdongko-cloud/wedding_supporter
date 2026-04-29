@@ -168,24 +168,28 @@ export default function BoardPage() {
 
   function shareKakao(post: Post) {
     const url = getShareUrl(post.id)
+    const imageUrl = `${window.location.origin}/og-image.png`
+    // 본문 텍스트 미리보기 (HTML 태그 제거, 최대 60자)
+    const plainText = post.content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 60)
+    const description = plainText || '딸깍, 결혼비용 계산기 게시판'
+
     const kakao = window.Kakao
     if (kakao && kakao.isInitialized?.()) {
       kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
           title: post.title,
-          description: '딸깍, 결혼비용 계산기 게시판',
-          imageUrl: `${window.location.origin}/icon-192.png`,
+          description,
+          imageUrl,
           link: { mobileWebUrl: url, webUrl: url },
         },
         buttons: [{ title: '게시글 보기', link: { mobileWebUrl: url, webUrl: url } }],
       })
       return
     }
-    // Kakao SDK 미설정 시 Web Share API 사용 (모바일 기본 공유)
+    // Kakao SDK 미설정 시 Web Share API 사용 (모바일 기본 공유 시트)
     if (navigator.share) {
-      navigator.share({ title: post.title, text: '딸깍, 결혼비용 계산기 게시판', url })
-        .catch(() => {})
+      navigator.share({ title: post.title, text: description, url }).catch(() => {})
     } else {
       copyLink(post.id)
       showToast('링크 복사됨 — 카카오톡에 붙여넣기 해주세요 📋')
