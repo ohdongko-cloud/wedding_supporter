@@ -64,9 +64,7 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
   CHECKLIST_STAGES.forEach(s => {
     checklist[s.id] = {
       items: s.items.map(it => ({
-        id: it.id,
-        completed: false,
-        hidden: false,
+        id: it.id, completed: false, hidden: false,
         deadline: it.time ? calcDeadline(defaultWeddingDate, it.time) : undefined,
       })),
       customItems: [],
@@ -84,15 +82,9 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
   }
 }
 
-// Supabase 동기화 헬퍼
-async function syncToCloud(nick: string, pinHash: string, data: UserData) {
+async function pushToCloud(nick: string, pinHash: string, data: UserData, updatedAt: string) {
   if (!supabase) return
-  await supabase.from('users').upsert({
-    nick: nick.toLowerCase(),
-    pin_hash: pinHash,
-    data,
-    updated_at: new Date().toISOString(),
-  })
+  await supabase.from('users').upsert({ nick: nick.toLowerCase(), pin_hash: pinHash, data, updated_at: updatedAt })
 }
 
 const ADMIN_HASH = hashPin('kims6804!')
@@ -109,18 +101,27 @@ export function seedAdminUser() {
 }
 
 interface AuthState {
-  user: AuthUser | null; userData: UserData | null
-  isDirty: boolean; lastSavedAt: string | null; isLoading: boolean
+  user: AuthUser | null
+  userData: UserData | null
+  isDirty: boolean
+  localUpdatedAt: string | null
+  isSaving: boolean
+  isLoading: boolean
   login: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string }>
   register: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string }>
-  loginAnon: () => void; logout: () => void
-  saveUserData: () => void; setUserData: (data: UserData) => void
-  markDirty: () => void; markClean: () => void
+  loginAnon: () => void
+  logout: () => void
+  saveUserData: () => Promise<'saved' | 'conflict' | 'error'>
+  forceSave: () => Promise<boolean>
+  forceLoadFromCloud: () => Promise<boolean>
+  setUserData: (data: UserData) => void
+  markDirty: () => void
+  markClean: (savedAt: string) => void
   deleteAccount: () => void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null, userData: null, isDirty: false, lastSavedAt: null, isLoading: false,
+  user: null, userData: null, isDirty: false, localUpdatedAt: null, isSaving: false, isLoading: false,
 
   async register(nick, pin) {
     if (nick.trim().length < 2) return { ok: false, error: '닉네임은 2자 이상 입력해주세요.' }
@@ -128,7 +129,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (pin.length < 6) return { ok: false, error: '비밀번호 6자리를 모두 입력해주세요.' }
 
     set({ isLoading: true })
-    // 닉네임 중복 확인: 클라우드 우선, 없으면 로컬
     if (supabase) {
       const { data } = await supabase.from('users').select('nick').eq('nick', nick.toLowerCase()).maybeSingle()
       if (data) { set({ isLoading: false }); return { ok: false, error: '이미 사용 중인 닉네임이에요.' } }
@@ -138,67 +138,103 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const ph = hashPin(pin)
     const userData = buildDefaultUserData(nick, ph)
+    const now = new Date().toISOString()
     StorageService.set(userKey(nick), userData)
     StorageService.addToRegistry(nick)
-    await syncToCloud(nick, ph, userData)
-    set({ user: { nick, pinHash: ph }, userData, isLoading: false })
+    await pushToCloud(nick, ph, userData, now)
+    set({ user: { nick, pinHash: ph }, userData, localUpdatedAt: now, isLoading: false })
     return { ok: true }
   },
 
   async login(nick, pin) {
     if (!nick) return { ok: false, error: '닉네임을 입력해주세요.' }
     if (pin.length < 6) return { ok: false, error: '비밀번호 6자리를 모두 입력해주세요.' }
-
     set({ isLoading: true })
     const ph = hashPin(pin)
 
-    // 클라우드에서 먼저 조회
     if (supabase) {
-      const { data: row } = await supabase.from('users').select('pin_hash, data').eq('nick', nick.toLowerCase()).maybeSingle()
+      const { data: row } = await supabase.from('users').select('pin_hash, data, updated_at').eq('nick', nick.toLowerCase()).maybeSingle()
       if (row) {
         if (row.pin_hash !== ph) { set({ isLoading: false }); return { ok: false, error: '비밀번호가 일치하지 않아요.' } }
         const userData = row.data as UserData
         userData.lastLoginAt = new Date().toISOString()
         StorageService.set(userKey(nick), userData)
         StorageService.addToRegistry(nick)
-        syncToCloud(nick, ph, userData)
-        set({ user: { nick, pinHash: ph }, userData, isLoading: false })
+        set({ user: { nick, pinHash: ph }, userData, localUpdatedAt: row.updated_at ?? null, isLoading: false })
         return { ok: true }
       }
     }
 
-    // 로컬 폴백 (Supabase 미설정 or 네트워크 오류 시)
     const saved = StorageService.get<UserData>(userKey(nick))
     if (!saved) { set({ isLoading: false }); return { ok: false, error: '저장된 데이터가 없어요.' } }
     if (saved.pinHash !== ph) { set({ isLoading: false }); return { ok: false, error: '비밀번호가 일치하지 않아요.' } }
     saved.lastLoginAt = new Date().toISOString()
     StorageService.set(userKey(nick), saved)
     StorageService.addToRegistry(nick)
-    // 로컬 데이터를 클라우드로 마이그레이션
-    syncToCloud(nick, ph, saved)
-    set({ user: { nick, pinHash: ph }, userData: saved, isLoading: false })
+    const now = new Date().toISOString()
+    pushToCloud(nick, ph, saved, now)
+    set({ user: { nick, pinHash: ph }, userData: saved, localUpdatedAt: now, isLoading: false })
     return { ok: true }
   },
 
   loginAnon() {
-    const data = buildDefaultUserData('게스트', '')
-    set({ user: { nick: '게스트', pinHash: '' }, userData: data, isDirty: false, lastSavedAt: null })
+    set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
   },
 
-  logout() { set({ user: null, userData: null, isDirty: false, lastSavedAt: null }) },
+  logout() { set({ user: null, userData: null, isDirty: false, localUpdatedAt: null }) },
 
-  saveUserData() {
-    const { user, userData } = get()
-    if (user && user.nick !== '게스트' && userData) {
-      StorageService.set(userKey(user.nick), userData)
-      set({ isDirty: false, lastSavedAt: new Date().toISOString() })
-      syncToCloud(user.nick, user.pinHash, userData)
+  async saveUserData() {
+    const { user, userData, localUpdatedAt } = get()
+    if (!user || user.nick === '게스트' || !userData) return 'saved'
+    set({ isSaving: true })
+
+    StorageService.set(userKey(user.nick), userData)
+
+    if (supabase) {
+      // 충돌 감지
+      const { data: serverRow } = await supabase.from('users').select('updated_at').eq('nick', user.nick.toLowerCase()).maybeSingle()
+      if (serverRow && localUpdatedAt && serverRow.updated_at !== localUpdatedAt) {
+        set({ isSaving: false })
+        return 'conflict'
+      }
+      const now = new Date().toISOString()
+      const { error } = await supabase.from('users').upsert({ nick: user.nick.toLowerCase(), pin_hash: user.pinHash, data: userData, updated_at: now })
+      if (error) { set({ isSaving: false }); return 'error' }
+      set({ isDirty: false, localUpdatedAt: now, isSaving: false })
+    } else {
+      const now = new Date().toISOString()
+      set({ isDirty: false, localUpdatedAt: now, isSaving: false })
     }
+    return 'saved'
+  },
+
+  async forceSave() {
+    const { user, userData } = get()
+    if (!user || user.nick === '게스트' || !userData) return false
+    set({ isSaving: true })
+    const now = new Date().toISOString()
+    StorageService.set(userKey(user.nick), userData)
+    if (supabase) {
+      const { error } = await supabase.from('users').upsert({ nick: user.nick.toLowerCase(), pin_hash: user.pinHash, data: userData, updated_at: now })
+      if (error) { set({ isSaving: false }); return false }
+    }
+    set({ isDirty: false, localUpdatedAt: now, isSaving: false })
+    return true
+  },
+
+  async forceLoadFromCloud() {
+    const { user } = get()
+    if (!user || !supabase) return false
+    const { data } = await supabase.from('users').select('data, updated_at').eq('nick', user.nick.toLowerCase()).maybeSingle()
+    if (!data) return false
+    StorageService.set(userKey(user.nick), data.data)
+    set({ userData: data.data, isDirty: false, localUpdatedAt: data.updated_at ?? null })
+    return true
   },
 
   setUserData(data) { set({ userData: data, isDirty: true }) },
   markDirty() { set({ isDirty: true }) },
-  markClean() { set({ isDirty: false }) },
+  markClean(savedAt) { set({ isDirty: false, localUpdatedAt: savedAt }) },
 
   deleteAccount() {
     const { user } = get()

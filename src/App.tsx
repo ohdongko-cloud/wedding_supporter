@@ -12,6 +12,7 @@ import HoneymoonPlanPage from './pages/HoneymoonPlanPage'
 import BoardPage from './pages/BoardPage'
 import MemoPage from './pages/MemoPage'
 import AdminPage from './pages/AdminPage'
+import SharedViewPage from './pages/SharedViewPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
@@ -34,6 +35,7 @@ export default function App() {
   return (
     <Routes>
       <Route path='/auth' element={user ? <Navigate to='/' replace /> : <AuthPage />} />
+      <Route path='/view/:shareToken' element={<SharedViewPage />} />
       <Route path='/*' element={
         <ProtectedRoute>
           <Layout>

@@ -69,3 +69,9 @@ export interface UserData {
   honeymoonPlan?: HoneymoonPlanState
   hasSeenTour?: boolean
 }
+export interface SharedSnapshot {
+  share_token: string
+  owner_nick: string
+  snapshot: UserData
+  created_at: string
+}

@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { DevRequestService } from '../../services/devRequests'
 import { AnalyticsService } from '../../services/analytics'
-import { useAutoSave } from '../../hooks/useAutoSave'
+import { ShareService } from '../../services/shareService'
 import DevRequestModal from '../DevRequestModal'
+import LeaveConfirmModal from '../LeaveConfirmModal'
+import ConflictModal from '../ConflictModal'
+import ShareModal from '../ShareModal'
 
 function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConfirm: () => void; onClose: () => void }) {
   return (
@@ -54,27 +57,104 @@ export default function Layout({ children }: LayoutProps) {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [devRequestOpen, setDevRequestOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [leaveModal, setLeaveModal] = useState(false)
+  const [conflictModal, setConflictModal] = useState(false)
+  const [shareModal, setShareModal] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
+  const [shareLoading, setShareLoading] = useState(false)
+  const pendingPath = useRef<string | null>(null)
+
   const location = useLocation()
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
+  const userData = useAuthStore(s => s.userData)
   const isDirty = useAuthStore(s => s.isDirty)
-  const lastSavedAt = useAuthStore(s => s.lastSavedAt)
+  const isSaving = useAuthStore(s => s.isSaving)
+  const localUpdatedAt = useAuthStore(s => s.localUpdatedAt)
   const logout = useAuthStore(s => s.logout)
   const deleteAccount = useAuthStore(s => s.deleteAccount)
+  const saveUserData = useAuthStore(s => s.saveUserData)
+  const forceSave = useAuthStore(s => s.forceSave)
+  const forceLoadFromCloud = useAuthStore(s => s.forceLoadFromCloud)
+
   const isAdmin = user?.nick === 'admin'
   const isGuest = user?.nick === '게스트'
   const title = PAGE_TITLES[location.pathname] ?? '딸깍, 결혼비용 계산기'
 
-  useAutoSave()
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty && !isGuest) { e.preventDefault(); e.returnValue = '' }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty, isGuest])
 
   useEffect(() => {
     if (isAdmin) setUnreadCount(DevRequestService.getUnreadCount())
   }, [isAdmin, devRequestOpen, sideOpen])
 
   function go(path: string) {
+    if (isDirty && !isGuest) {
+      pendingPath.current = path
+      setSideOpen(false)
+      setLeaveModal(true)
+      return
+    }
     AnalyticsService.track(`nav:${path}`)
     navigate(path)
     setSideOpen(false)
+  }
+
+  async function handleSave() {
+    if (isGuest || !userData) return
+    const result = await saveUserData()
+    if (result === 'conflict') setConflictModal(true)
+  }
+
+  async function handleLeaveSave() {
+    setLeaveModal(false)
+    await forceSave()
+    if (pendingPath.current) {
+      AnalyticsService.track(`nav:${pendingPath.current}`)
+      navigate(pendingPath.current)
+      pendingPath.current = null
+    }
+  }
+
+  function handleLeaveDiscard() {
+    setLeaveModal(false)
+    if (pendingPath.current) {
+      AnalyticsService.track(`nav:${pendingPath.current}`)
+      navigate(pendingPath.current)
+      pendingPath.current = null
+    }
+  }
+
+  function handleLeaveCancel() {
+    setLeaveModal(false)
+    pendingPath.current = null
+  }
+
+  async function handleConflictOverwrite() {
+    setConflictModal(false)
+    await forceSave()
+  }
+
+  async function handleConflictLoadServer() {
+    setConflictModal(false)
+    await forceLoadFromCloud()
+  }
+
+  async function handleShare() {
+    if (!user || !userData || isGuest) return
+    setShareLoading(true)
+    setSideOpen(false)
+    const token = await ShareService.createShareLink(user.nick, userData)
+    setShareLoading(false)
+    if (token) {
+      setShareUrl(`${window.location.origin}/view/${token}`)
+      setShareModal(true)
+    }
   }
 
   function handleDelete() {
@@ -91,31 +171,43 @@ export default function Layout({ children }: LayoutProps) {
     return `${ampm} ${h % 12 || 12}:${String(m).padStart(2, '0')}에 저장됨`
   }
 
-  const saveStatus = isGuest ? null
-    : isDirty ? { text: '변경사항 있음', color: 'rgba(255,255,255,.65)' }
-    : lastSavedAt ? { text: '저장됨 ✓', color: 'rgba(255,255,255,.9)' }
-    : null
-
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {deleteConfirm && <DeleteConfirmPopup nick={user?.nick ?? ''} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />}
       {devRequestOpen && <DevRequestModal onClose={() => setDevRequestOpen(false)} />}
+      {leaveModal && <LeaveConfirmModal onSave={handleLeaveSave} onDiscard={handleLeaveDiscard} onCancel={handleLeaveCancel} />}
+      {conflictModal && <ConflictModal onOverwrite={handleConflictOverwrite} onLoadServer={handleConflictLoadServer} />}
+      {shareModal && <ShareModal shareUrl={shareUrl} onClose={() => setShareModal(false)} />}
 
       <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'linear-gradient(135deg,var(--pk),var(--mn))', display: 'flex', alignItems: 'center', padding: '0 16px', height: 56, boxShadow: '0 2px 12px rgba(255,107,157,.3)' }}>
         <button data-tour="menu-button" onClick={() => setSideOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: '6px 8px 6px 0' }}>☰</button>
         <span style={{ flex: 1, textAlign: 'center', color: '#fff', fontSize: 16, fontWeight: 800 }}>{title}</span>
-        <div style={{ textAlign: 'right', minWidth: 60 }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>
-            {user?.nick}{isAdmin && ' 🔑'}
-          </div>
-          {saveStatus && (
-            <div style={{ fontSize: 10, color: saveStatus.color, lineHeight: 1.3 }}>
-              {saveStatus.text}
-              {!isDirty && lastSavedAt && (
-                <div style={{ fontSize: 9, opacity: .8 }}>{fmtSavedAt(lastSavedAt)}</div>
-              )}
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {!isGuest && (
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !isDirty}
+              style={{
+                background: isDirty ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.1)',
+                border: `1px solid ${isDirty ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.25)'}`,
+                color: '#fff',
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: isDirty && !isSaving ? 'pointer' : 'default',
+                transition: 'all .2s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isSaving ? '저장 중...' : isDirty ? '💾 저장' : localUpdatedAt ? `✓ ${fmtSavedAt(localUpdatedAt)}` : '저장됨'}
+            </button>
           )}
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>
+              {user?.nick}{isAdmin && ' 🔑'}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -142,6 +234,16 @@ export default function Layout({ children }: LayoutProps) {
             </button>
           )}
           <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />
+          {!isGuest && (
+            <button
+              onClick={handleShare}
+              disabled={shareLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}
+            >
+              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔗</span>
+              {shareLoading ? '링크 생성 중...' : '결과 공유하기'}
+            </button>
+          )}
           <button onClick={() => { setSideOpen(false); setDevRequestOpen(true) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}>
             <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>💬</span>개발 요청
           </button>
