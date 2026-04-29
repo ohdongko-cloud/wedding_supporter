@@ -6,6 +6,7 @@ import { BoardService } from '../services/boardService'
 import { MiniCalendar, WeeklyTasks, MonthTimeline } from '../components/ChecklistWidgets'
 import type { DeadlineItem } from '../components/ChecklistWidgets'
 import type { CalcState, Post } from '../types'
+import TourOverlay from '../components/onboarding/TourOverlay'
 
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
 
@@ -49,11 +50,27 @@ export default function DashboardPage() {
   const [saved, setSaved] = useState(false)
   const [guestPopup, setGuestPopup] = useState(false)
   const [recentPosts, setRecentPosts] = useState<Post[]>([])
+  const [showTour, setShowTour] = useState(false)
 
   useEffect(() => {
     const posts = BoardService.getPosts()
     setRecentPosts(posts.slice(0, 4))
   }, [])
+
+  useEffect(() => {
+    if (!isGuest && userData.hasSeenTour === false) {
+      const t = setTimeout(() => setShowTour(true), 600)
+      return () => clearTimeout(t)
+    }
+  }, [isGuest, userData.hasSeenTour])
+
+  function completeTour() {
+    setShowTour(false)
+    if (!isGuest) {
+      setUserData({ ...userData, hasSeenTour: true })
+      saveUserData()
+    }
+  }
 
   let total = 0, done = 0
   CHECKLIST_STAGES.forEach(s => {
@@ -106,9 +123,10 @@ export default function DashboardPage() {
   return (
     <div>
       {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
+      {showTour && <TourOverlay onComplete={completeTour} />}
 
       {/* Wedding date + D-DAY */}
-      <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>
+      <div data-tour="wedding-date" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>
         {dday !== null ? (
           <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', marginBottom: 16 }}>
             <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,.15)', borderRadius: 12, padding: '14px 8px' }}>
@@ -151,7 +169,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Checklist progress section */}
-      <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '16px 16px 14px', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.2)' }}>
+      <div data-tour="progress" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '16px 16px 14px', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div>
             <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{pct}%</div>
@@ -175,7 +193,7 @@ export default function DashboardPage() {
       <WeeklyTasks deadlineItems={deadlineItems} onToggle={toggleItem} />
 
       {/* Budget summary */}
-      <div style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(102,126,234,.25)' }}>
+      <div data-tour="budget" style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(102,126,234,.25)' }}>
         <div style={{ fontSize: 13, fontWeight: 700, opacity: .85, marginBottom: 12 }}>예산 현황</div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
           {[
@@ -198,12 +216,12 @@ export default function DashboardPage() {
       {/* Quick navigation */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
         {[
-          { path: '/checklist', icon: '✅', label: '체크리스트', sub: `${pct}% 완료` },
-          { path: '/calc/wedding', icon: '💒', label: '결혼식 비용', sub: `${fmt(calcTotal(userData.calcWedding, true))}만원` },
-          { path: '/honeymoon', icon: '✈️', label: '신혼여행 계획', sub: `${fmt(honeymoonTotal)}만원` },
-          { path: '/calc/house', icon: '🏡', label: '신혼집 비용', sub: `${fmt(calcTotal(userData.calcHouse))}만원` },
+          { path: '/checklist', icon: '✅', label: '체크리스트', sub: `${pct}% 완료`, tour: 'nav-checklist' },
+          { path: '/calc/wedding', icon: '💒', label: '결혼식 비용', sub: `${fmt(calcTotal(userData.calcWedding, true))}만원`, tour: 'nav-wedding' },
+          { path: '/honeymoon', icon: '✈️', label: '신혼여행 계획', sub: `${fmt(honeymoonTotal)}만원`, tour: undefined },
+          { path: '/calc/house', icon: '🏡', label: '신혼집 비용', sub: `${fmt(calcTotal(userData.calcHouse))}만원`, tour: undefined },
         ].map(q => (
-          <button key={q.path} onClick={() => navigate(q.path)} style={{ background: '#fff', border: '1.5px solid var(--pk4)', borderRadius: 14, padding: '14px 12px', textAlign: 'center', cursor: 'pointer', color: 'var(--text)' }}>
+          <button key={q.path} data-tour={q.tour} onClick={() => navigate(q.path)} style={{ background: '#fff', border: '1.5px solid var(--pk4)', borderRadius: 14, padding: '14px 12px', textAlign: 'center', cursor: 'pointer', color: 'var(--text)' }}>
             <span style={{ fontSize: 24, display: 'block', marginBottom: 4 }}>{q.icon}</span>
             <div style={{ fontSize: 13, fontWeight: 700 }}>{q.label}</div>
             <div style={{ fontSize: 11, color: 'var(--pk)', marginTop: 3 }}>{q.sub}</div>

@@ -81,6 +81,7 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
     venueName: '',
     memos: [], createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString(),
     honeymoonPlan: makeDefaultHoneymoonPlan(),
+    hasSeenTour: false,
   }
 }
 

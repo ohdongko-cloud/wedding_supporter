@@ -67,4 +67,5 @@ export interface UserData {
   memos: Memo[]; createdAt: string; lastLoginAt: string
   houseDetail?: HouseDetail
   honeymoonPlan?: HoneymoonPlanState
+  hasSeenTour?: boolean
 }
