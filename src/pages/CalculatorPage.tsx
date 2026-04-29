@@ -63,7 +63,8 @@ export default function CalculatorPage() {
   function computeTotal(c: CalcState, ct: CalcType = calcType): CalcState {
     let total = 0
     if (ct === 'wedding') {
-      total += Math.round((c.mealCount * c.mealPrice) / 10000)
+      const effectivePrice = c.mealPrice === 0 ? (c.mealCustom || 0) : c.mealPrice
+      total += Math.round((c.mealCount * effectivePrice) / 10000)
       total += c.venueDirect ?? 0
     }
     Object.values(c.cats).forEach(cat => {
@@ -135,7 +136,8 @@ export default function CalculatorPage() {
   const catLabels = CALC_CAT_LABELS[calcType] || {}
   const diff = calc.budget - calc.totalCost
   const usedPct = calc.budget > 0 ? Math.min(100, Math.round(calc.totalCost / calc.budget * 100)) : 0
-  const mealTotal = calcType === 'wedding' ? Math.round((calc.mealCount * calc.mealPrice) / 10000) : 0
+  const effectiveMealPrice = calc.mealPrice === 0 ? (calc.mealCustom || 0) : calc.mealPrice
+  const mealTotal = calcType === 'wedding' ? Math.round((calc.mealCount * effectiveMealPrice) / 10000) : 0
 
   return (
     <div>
@@ -180,8 +182,30 @@ export default function CalculatorPage() {
         <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 14, boxShadow: '0 2px 12px rgba(255,107,157,.08)', border: '1.5px solid var(--pk4)' }}>
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12 }}>식사 및 대관료</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+            {/* 홀 유형 */}
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6, fontWeight: 600 }}>홀 유형</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {['웨딩홀', '호텔', '야외', '레스토랑', '기타'].map(hall => (
+                  <button
+                    key={hall}
+                    onClick={() => updateCalc({ ...calc, venueHall: calc.venueHall === hall ? '' : hall })}
+                    style={{
+                      padding: '5px 12px', borderRadius: 16, fontSize: 12, fontWeight: 700,
+                      border: '1.5px solid', cursor: 'pointer',
+                      borderColor: calc.venueHall === hall ? 'var(--pk)' : 'var(--gray2)',
+                      background: calc.venueHall === hall ? 'var(--pk)' : '#fff',
+                      color: calc.venueHall === hall ? '#fff' : 'var(--text2)',
+                    }}
+                  >{hall}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* 식사 인원 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, minWidth: 60, color: 'var(--text2)' }}>식사 인원</span>
+              <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>식사 인원</span>
               <input
                 type='number'
                 value={calc.mealCount}
@@ -190,20 +214,43 @@ export default function CalculatorPage() {
               />
               <span style={{ fontSize: 13, color: 'var(--text2)' }}>명</span>
             </div>
+
+            {/* 식사 단가 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, minWidth: 60, color: 'var(--text2)' }}>식사 단가</span>
+              <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>식사 단가</span>
               <select
                 value={calc.mealPrice}
-                onChange={e => updateCalc({ ...calc, mealPrice: Number(e.target.value) })}
+                onChange={e => {
+                  const v = Number(e.target.value)
+                  updateCalc({ ...calc, mealPrice: v, mealCustom: v === 0 ? calc.mealCustom : 0 })
+                }}
                 style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none', background: '#fff' }}
               >
                 {MEAL_PRICE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
+                <option value={0}>직접 입력</option>
               </select>
             </div>
+
+            {/* 단가 직접 입력 (mealPrice === 0 일 때) */}
+            {calc.mealPrice === 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>직접 입력</span>
+                <input
+                  type='number'
+                  value={calc.mealCustom || ''}
+                  onChange={e => updateCalc({ ...calc, mealCustom: Number(e.target.value) || 0 })}
+                  placeholder='예: 120000'
+                  style={{ flex: 1, border: '1.5px solid var(--pk)', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'nowrap' }}>원/인</span>
+              </div>
+            )}
+
+            {/* 대관료 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, minWidth: 60, color: 'var(--text2)' }}>대관료</span>
+              <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>대관료</span>
               <input
                 type='number'
                 value={calc.venueDirect || 0}
@@ -212,10 +259,14 @@ export default function CalculatorPage() {
               />
               <span style={{ fontSize: 13, color: 'var(--text2)' }}>만원</span>
             </div>
+
             <div style={{ fontSize: 12, color: 'var(--pk)', fontWeight: 700, marginTop: 2 }}>
               소계: {fmt(mealTotal + (calc.venueDirect || 0))}
               <span style={{ color: 'var(--text2)', fontWeight: 400, marginLeft: 8 }}>
                 (식대 {fmt(mealTotal)} + 대관료 {fmt(calc.venueDirect || 0)})
+                {calc.mealPrice === 0 && calc.mealCustom > 0 && (
+                  <span style={{ marginLeft: 4 }}>· {(calc.mealCustom / 10000).toFixed(1)}만원/인 × {calc.mealCount}명</span>
+                )}
               </span>
             </div>
           </div>

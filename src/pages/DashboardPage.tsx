@@ -10,7 +10,8 @@ function fmt(n: number) { return n.toLocaleString('ko-KR') }
 function calcTotal(cs: CalcState, isWedding = false): number {
   let t = 0
   if (isWedding) {
-    t += cs._mealTotal ?? Math.round((cs.mealCount * cs.mealPrice) / 10000)
+    const effectivePrice = cs.mealPrice === 0 ? (cs.mealCustom || 0) : cs.mealPrice
+    t += cs._mealTotal ?? Math.round((cs.mealCount * effectivePrice) / 10000)
     t += cs.venueDirect ?? 0
   }
   Object.values(cs.cats).forEach(cat => {
