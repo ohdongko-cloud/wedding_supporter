@@ -19,9 +19,9 @@ function makeDefaultCalcState(catKeys: string[], isWedding = false): CalcState {
     mealCount: isWedding ? 200 : 0,
     mealPrice: isWedding ? 77000 : 99000,
     mealCustom: 0,
-    venueHall: isWedding ? 'JK아트컨벤션' : '',
-    venueRoom: isWedding ? '아트리움홀' : '',
-    venueDirect: isWedding ? 1000 : 0,
+    venueHall: isWedding ? '명동성당' : '',
+    venueRoom: isWedding ? '파밀리아홀' : '',
+    venueDirect: isWedding ? 200 : 0,
     cats, totalCost: 0,
   }
 }

@@ -152,6 +152,8 @@ export const CALC_SEEDS: Record<string, Record<string, [string, string, number, 
 }
 
 export const MEAL_PRICE_OPTIONS = [
+  { label: '5.5만원/인', value: 55000 },
+  { label: '6.6만원/인', value: 66000 },
   { label: '7.7만원/인', value: 77000 },
   { label: '8.8만원/인', value: 88000 },
   { label: '9.9만원/인', value: 99000 },

@@ -139,7 +139,7 @@ export default function DashboardPage() {
             type='text'
             value={venueName}
             onChange={e => setVenueName(e.target.value)}
-            placeholder='예: 더 플라자 호텔 (선택)'
+            placeholder='예: 명동성당 (선택)'
             style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }}
           />
         </div>
