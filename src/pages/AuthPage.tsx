@@ -8,6 +8,7 @@ export default function AuthPage() {
   const [pins, setPins] = useState<string[]>(Array(6).fill(''))
   const [adminPw, setAdminPw] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const pinRefs = useRef<(HTMLInputElement | null)[]>([])
   const navigate = useNavigate()
   const { register, login, loginAnon } = useAuthStore()
@@ -17,7 +18,15 @@ export default function AuthPage() {
   function handlePinChange(i: number, val: string) { const v = val.replace(/\D/, '').slice(0, 1); const next = [...pins]; next[i] = v; setPins(next); if (v && i < 5) pinRefs.current[i + 1]?.focus() }
   function handlePinKey(i: number, e: KeyboardEvent<HTMLInputElement>) { if (e.key === 'Backspace' && !pins[i] && i > 0) pinRefs.current[i - 1]?.focus() }
   function handlePinPaste(e: React.ClipboardEvent) { e.preventDefault(); const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6); const next = Array(6).fill(''); text.split('').forEach((c, i) => { next[i] = c }); setPins(next); pinRefs.current[Math.min(text.length, 5)]?.focus() }
-  function submit() { setError(''); const res = mode === 'register' ? register(nick.trim(), pin) : login(nick.trim(), pin); if (res.ok) navigate('/'); else setError(res.error ?? '') }
+  async function submit() {
+    if (loading) return
+    setError('')
+    setLoading(true)
+    const res = await (mode === 'register' ? register(nick.trim(), pin) : login(nick.trim(), pin))
+    setLoading(false)
+    if (res.ok) navigate('/')
+    else setError(res.error ?? '')
+  }
   const base: React.CSSProperties = { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(145deg,#ff6b9d 0%,#ff8fab 40%,#c77dff 100%)', padding: 20 }
   const card: React.CSSProperties = { background: '#fff', borderRadius: 24, padding: '32px 28px', width: 340, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(255,107,157,.2)' }
   if (mode === 'splash') return (
@@ -63,7 +72,13 @@ export default function AuthPage() {
           )}
         </div>
         <div style={{ fontSize: 12, color: '#e03060', minHeight: 16, marginBottom: 8 }}>{error}</div>
-        <button style={{ width: '100%', border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg,var(--pk),var(--mn))', color: '#fff' }} onClick={submit}>{mode === 'register' ? '시작하기 →' : '불러오기 →'}</button>
+        <button
+          style={{ width: '100%', border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', background: loading ? 'var(--gray2)' : 'linear-gradient(135deg,var(--pk),var(--mn))', color: '#fff', opacity: loading ? .7 : 1, transition: 'all .2s' }}
+          onClick={submit}
+          disabled={loading}
+        >
+          {loading ? '잠시만요...' : (mode === 'register' ? '시작하기 →' : '불러오기 →')}
+        </button>
         {mode === 'register' && (
           <button style={{ width: '100%', border: '1.5px solid var(--gray2)', borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 600, cursor: 'pointer', background: 'var(--gray1)', color: 'var(--text2)', marginTop: 8 }} onClick={() => { loginAnon(); navigate('/') }}>저장 없이 둘러보기</button>
         )}

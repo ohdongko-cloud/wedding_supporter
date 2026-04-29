@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { AuthUser, UserData } from '../types'
 import { StorageService, userKey } from '../services/storage'
 import { CHECKLIST_STAGES } from '../data/checklistSeed'
+import { supabase } from '../services/supabaseClient'
 
 export function hashPin(pin: string): string {
   let h = 0
@@ -26,7 +27,6 @@ function makeDefaultCalcState(catKeys: string[], isWedding = false): CalcState {
   }
 }
 
-// time 필드(D-300, D+7, D-day 등)를 기준으로 마감일 계산
 function calcDeadline(weddingDate: Date, time: string): string | undefined {
   if (!time) return undefined
   if (time === 'D-day') return weddingDate.toISOString().slice(0, 10)
@@ -56,7 +56,6 @@ function makeDefaultHoneymoonPlan(): import('../types').HoneymoonPlanState {
 }
 
 export function buildDefaultUserData(nick: string, pinHash: string): UserData {
-  // 결혼 예정일: 오늘로부터 정확히 1년 뒤
   const defaultWeddingDate = new Date()
   defaultWeddingDate.setFullYear(defaultWeddingDate.getFullYear() + 1)
   const weddingDateStr = defaultWeddingDate.toISOString().slice(0, 10)
@@ -85,12 +84,22 @@ export function buildDefaultUserData(nick: string, pinHash: string): UserData {
   }
 }
 
+// Supabase 동기화 헬퍼
+async function syncToCloud(nick: string, pinHash: string, data: UserData) {
+  if (!supabase) return
+  await supabase.from('users').upsert({
+    nick: nick.toLowerCase(),
+    pin_hash: pinHash,
+    data,
+    updated_at: new Date().toISOString(),
+  })
+}
+
 const ADMIN_HASH = hashPin('kims6804!')
 
 export function seedAdminUser() {
   const existing = StorageService.get<UserData>(userKey('admin'))
   if (existing) {
-    // Always sync the admin password hash on every load
     StorageService.set(userKey('admin'), { ...existing, pinHash: ADMIN_HASH })
   } else {
     const data = buildDefaultUserData('admin', ADMIN_HASH)
@@ -101,9 +110,9 @@ export function seedAdminUser() {
 
 interface AuthState {
   user: AuthUser | null; userData: UserData | null
-  isDirty: boolean; lastSavedAt: string | null
-  login: (nick: string, pin: string) => { ok: boolean; error?: string }
-  register: (nick: string, pin: string) => { ok: boolean; error?: string }
+  isDirty: boolean; lastSavedAt: string | null; isLoading: boolean
+  login: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string }>
+  register: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string }>
   loginAnon: () => void; logout: () => void
   saveUserData: () => void; setUserData: (data: UserData) => void
   markDirty: () => void; markClean: () => void
@@ -111,50 +120,92 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null, userData: null, isDirty: false, lastSavedAt: null,
-  register(nick, pin) {
+  user: null, userData: null, isDirty: false, lastSavedAt: null, isLoading: false,
+
+  async register(nick, pin) {
     if (nick.trim().length < 2) return { ok: false, error: '닉네임은 2자 이상 입력해주세요.' }
     if (nick.toLowerCase() === 'admin') return { ok: false, error: '사용할 수 없는 닉네임이에요.' }
     if (pin.length < 6) return { ok: false, error: '비밀번호 6자리를 모두 입력해주세요.' }
-    const existing = StorageService.get<UserData>(userKey(nick))
-    if (existing) return { ok: false, error: '이미 사용 중인 닉네임이에요.' }
+
+    set({ isLoading: true })
+    // 닉네임 중복 확인: 클라우드 우선, 없으면 로컬
+    if (supabase) {
+      const { data } = await supabase.from('users').select('nick').eq('nick', nick.toLowerCase()).maybeSingle()
+      if (data) { set({ isLoading: false }); return { ok: false, error: '이미 사용 중인 닉네임이에요.' } }
+    } else {
+      if (StorageService.get<UserData>(userKey(nick))) { set({ isLoading: false }); return { ok: false, error: '이미 사용 중인 닉네임이에요.' } }
+    }
+
     const ph = hashPin(pin)
-    const data = buildDefaultUserData(nick, ph)
-    StorageService.set(userKey(nick), data)
+    const userData = buildDefaultUserData(nick, ph)
+    StorageService.set(userKey(nick), userData)
     StorageService.addToRegistry(nick)
-    set({ user: { nick, pinHash: ph }, userData: data })
+    await syncToCloud(nick, ph, userData)
+    set({ user: { nick, pinHash: ph }, userData, isLoading: false })
     return { ok: true }
   },
-  login(nick, pin) {
+
+  async login(nick, pin) {
     if (!nick) return { ok: false, error: '닉네임을 입력해주세요.' }
     if (pin.length < 6) return { ok: false, error: '비밀번호 6자리를 모두 입력해주세요.' }
+
+    set({ isLoading: true })
+    const ph = hashPin(pin)
+
+    // 클라우드에서 먼저 조회
+    if (supabase) {
+      const { data: row } = await supabase.from('users').select('pin_hash, data').eq('nick', nick.toLowerCase()).maybeSingle()
+      if (row) {
+        if (row.pin_hash !== ph) { set({ isLoading: false }); return { ok: false, error: '비밀번호가 일치하지 않아요.' } }
+        const userData = row.data as UserData
+        userData.lastLoginAt = new Date().toISOString()
+        StorageService.set(userKey(nick), userData)
+        StorageService.addToRegistry(nick)
+        syncToCloud(nick, ph, userData)
+        set({ user: { nick, pinHash: ph }, userData, isLoading: false })
+        return { ok: true }
+      }
+    }
+
+    // 로컬 폴백 (Supabase 미설정 or 네트워크 오류 시)
     const saved = StorageService.get<UserData>(userKey(nick))
-    if (!saved) return { ok: false, error: '저장된 데이터가 없어요.' }
-    if (saved.pinHash !== hashPin(pin)) return { ok: false, error: '비밀번호가 일치하지 않아요.' }
+    if (!saved) { set({ isLoading: false }); return { ok: false, error: '저장된 데이터가 없어요.' } }
+    if (saved.pinHash !== ph) { set({ isLoading: false }); return { ok: false, error: '비밀번호가 일치하지 않아요.' } }
     saved.lastLoginAt = new Date().toISOString()
     StorageService.set(userKey(nick), saved)
     StorageService.addToRegistry(nick)
-    set({ user: { nick, pinHash: saved.pinHash }, userData: saved })
+    // 로컬 데이터를 클라우드로 마이그레이션
+    syncToCloud(nick, ph, saved)
+    set({ user: { nick, pinHash: ph }, userData: saved, isLoading: false })
     return { ok: true }
   },
-  loginAnon() { const data = buildDefaultUserData('게스트', ''); set({ user: { nick: '게스트', pinHash: '' }, userData: data, isDirty: false, lastSavedAt: null }) },
+
+  loginAnon() {
+    const data = buildDefaultUserData('게스트', '')
+    set({ user: { nick: '게스트', pinHash: '' }, userData: data, isDirty: false, lastSavedAt: null })
+  },
+
   logout() { set({ user: null, userData: null, isDirty: false, lastSavedAt: null }) },
+
   saveUserData() {
     const { user, userData } = get()
     if (user && user.nick !== '게스트' && userData) {
       StorageService.set(userKey(user.nick), userData)
       set({ isDirty: false, lastSavedAt: new Date().toISOString() })
+      syncToCloud(user.nick, user.pinHash, userData)
     }
   },
+
   setUserData(data) { set({ userData: data, isDirty: true }) },
   markDirty() { set({ isDirty: true }) },
   markClean() { set({ isDirty: false }) },
+
   deleteAccount() {
     const { user } = get()
     if (!user || user.nick === '게스트') return
-    const data = StorageService.get<UserData>(userKey(user.nick))
-    if (data) StorageService.set(userKey(user.nick), { ...data, pinHash: '__deleted__' })
     StorageService.removeFromRegistry(user.nick)
+    StorageService.del(userKey(user.nick))
+    if (supabase) supabase.from('users').delete().eq('nick', user.nick.toLowerCase())
     set({ user: null, userData: null })
   },
 }))
