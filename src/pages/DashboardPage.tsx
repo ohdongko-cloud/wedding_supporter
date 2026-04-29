@@ -57,10 +57,19 @@ export default function DashboardPage() {
     setRecentPosts(posts.slice(0, 4))
   }, [])
 
+  const GUEST_SKIP_KEY = 'ws_guest_tour_skip'
+
   useEffect(() => {
     if (!isGuest && userData.hasSeenTour === false) {
       const t = setTimeout(() => setShowTour(true), 600)
       return () => clearTimeout(t)
+    }
+    if (isGuest) {
+      const until = localStorage.getItem(GUEST_SKIP_KEY)
+      if (!until || Date.now() > parseInt(until)) {
+        const t = setTimeout(() => setShowTour(true), 600)
+        return () => clearTimeout(t)
+      }
     }
   }, [isGuest, userData.hasSeenTour])
 
@@ -70,6 +79,11 @@ export default function DashboardPage() {
       setUserData({ ...userData, hasSeenTour: true })
       saveUserData()
     }
+  }
+
+  function skipTourWeek() {
+    localStorage.setItem(GUEST_SKIP_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000))
+    setShowTour(false)
   }
 
   let total = 0, done = 0
@@ -123,7 +137,7 @@ export default function DashboardPage() {
   return (
     <div>
       {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
-      {showTour && <TourOverlay onComplete={completeTour} />}
+      {showTour && <TourOverlay onComplete={completeTour} onSkipWeek={isGuest ? skipTourWeek : undefined} />}
 
       {/* Wedding date + D-DAY */}
       <div data-tour="wedding-date" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>

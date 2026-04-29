@@ -3,13 +3,14 @@ import { TOUR_STEPS } from '../../data/tourSteps'
 
 interface Props {
   onComplete: () => void
+  onSkipWeek?: () => void
 }
 
 interface SpotRect { top: number; left: number; width: number; height: number }
 
 const PAD = 12
 
-export default function TourOverlay({ onComplete }: Props) {
+export default function TourOverlay({ onComplete, onSkipWeek }: Props) {
   const [step, setStep] = useState(0)
   const [spot, setSpot] = useState<SpotRect | null>(null)
 
@@ -146,9 +147,21 @@ export default function TourOverlay({ onComplete }: Props) {
           </button>
         </div>
 
-        <button onClick={onComplete} style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', opacity: .7 }}>
-          투어 건너뛰기
-        </button>
+        {onSkipWeek ? (
+          <div style={{ display: 'flex', gap: 12, marginTop: 10, justifyContent: 'center' }}>
+            <button onClick={onSkipWeek} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', opacity: .7 }}>
+              일주일간 보지 않기
+            </button>
+            <span style={{ color: 'var(--gray2)', fontSize: 12 }}>|</span>
+            <button onClick={onComplete} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', opacity: .7 }}>
+              건너뛰기
+            </button>
+          </div>
+        ) : (
+          <button onClick={onComplete} style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', opacity: .7 }}>
+            투어 건너뛰기
+          </button>
+        )}
       </div>
     </>
   )
