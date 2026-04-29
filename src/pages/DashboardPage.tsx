@@ -58,6 +58,7 @@ export default function DashboardPage() {
   }, [])
 
   const GUEST_SKIP_KEY = 'ws_guest_tour_skip'
+  const GUEST_SEEN_KEY = 'ws_guest_tour_seen'
 
   useEffect(() => {
     if (!isGuest && userData.hasSeenTour === false) {
@@ -65,8 +66,9 @@ export default function DashboardPage() {
       return () => clearTimeout(t)
     }
     if (isGuest) {
+      const seen = sessionStorage.getItem(GUEST_SEEN_KEY)
       const until = localStorage.getItem(GUEST_SKIP_KEY)
-      if (!until || Date.now() > parseInt(until)) {
+      if (!seen && (!until || Date.now() > parseInt(until))) {
         const t = setTimeout(() => setShowTour(true), 600)
         return () => clearTimeout(t)
       }
@@ -78,6 +80,8 @@ export default function DashboardPage() {
     if (!isGuest) {
       setUserData({ ...userData, hasSeenTour: true })
       saveUserData()
+    } else {
+      sessionStorage.setItem(GUEST_SEEN_KEY, '1')
     }
   }
 
@@ -255,7 +259,7 @@ export default function DashboardPage() {
           <div key={post.id} onClick={() => navigate('/board')} style={{ padding: '11px 16px', borderBottom: idx < recentPosts.length - 1 ? '1px solid var(--gray1)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
             {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>공지</span>}
             <span style={{ flex: 1, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</span>
-            <span style={{ fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>{post.author}</span>
+            <span style={{ fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>{post.author === 'admin' ? '주인장' : post.author}</span>
           </div>
         ))}
       </div>

@@ -8,6 +8,7 @@ type View = 'list' | 'detail' | 'edit'
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
+function displayAuthor(nick: string) { return nick === 'admin' ? '주인장' : nick }
 
 export default function BoardPage() {
   const user = useAuthStore(s => s.user)!
@@ -131,7 +132,7 @@ export default function BoardPage() {
           {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, marginRight: 8 }}>공지</span>}
           <div style={{ fontSize: 18, fontWeight: 800, margin: post.isNotice ? '10px 0 8px' : '0 0 8px' }}>{post.title}</div>
           <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
-            <span>{post.author}</span><span>{fmtDate(post.createdAt)}</span><span>조회 {post.views}</span>
+            <span>{displayAuthor(post.author)}</span><span>{fmtDate(post.createdAt)}</span><span>조회 {post.views}</span>
           </div>
           <div style={{ fontSize: 14, lineHeight: 1.85, whiteSpace: 'pre-wrap', borderTop: '1px solid var(--gray1)', paddingTop: 14 }}>{post.content}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--gray1)' }}>
@@ -154,7 +155,7 @@ export default function BoardPage() {
             <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--gray1)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pk)', marginBottom: 4 }}>
-                  {c.author} <span style={{ color: 'var(--text2)', fontWeight: 400 }}>{fmtDate(c.createdAt)}</span>
+                  {displayAuthor(c.author)} <span style={{ color: 'var(--text2)', fontWeight: 400 }}>{fmtDate(c.createdAt)}</span>
                 </div>
                 <div style={{ fontSize: 13, lineHeight: 1.6 }}>{c.content}</div>
               </div>
@@ -204,7 +205,7 @@ export default function BoardPage() {
               {post.comments.length > 0 && <span style={{ fontSize: 12, color: 'var(--pk)', fontWeight: 700, flexShrink: 0 }}>[{post.comments.length}]</span>}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', gap: 10 }}>
-              <span>{post.author}</span><span>{fmtDate(post.createdAt)}</span><span>조회 {post.views}</span><span>❤️ {post.likes}</span>
+              <span>{displayAuthor(post.author)}</span><span>{fmtDate(post.createdAt)}</span><span>조회 {post.views}</span><span>❤️ {post.likes}</span>
             </div>
           </div>
         ))}
