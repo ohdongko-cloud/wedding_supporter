@@ -2,56 +2,82 @@ import { useState, useRef, KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 
+type Mode = 'login' | 'register'
+
 export default function AuthPage() {
+  const [mode, setMode] = useState<Mode>('login')
   const [nick, setNick] = useState('')
   const [pins, setPins] = useState<string[]>(Array(6).fill(''))
   const [adminPw, setAdminPw] = useState('')
+  const [hintInput, setHintInput] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loginFailCount, setLoginFailCount] = useState(0)
+  const [shownHint, setShownHint] = useState('')
   const pinRefs = useRef<(HTMLInputElement | null)[]>([])
   const navigate = useNavigate()
   const { register, login, loginAnon } = useAuthStore()
 
   const isAdmin = nick.trim().toLowerCase() === 'admin'
   const pin = isAdmin ? adminPw : pins.join('')
+  const pinFilled = pins.filter(Boolean).length
+  const canSubmit = nick.trim().length >= 2 && (isAdmin ? !!adminPw : pinFilled === 6)
 
-  async function doSubmit(pinVal: string) {
+  function switchMode(m: Mode) {
+    setMode(m)
+    setError('')
+    setShownHint('')
+    setLoginFailCount(0)
+    setPins(Array(6).fill(''))
+    setHintInput('')
+  }
+
+  /* ── 로그인 ── */
+  async function doLogin(pinVal?: string) {
+    const p = pinVal ?? pin
     if (loading) return
     if (!nick.trim()) { setError('닉네임을 입력해주세요.'); return }
     if (isAdmin && !adminPw) { setError('관리자 비밀번호를 입력해주세요.'); return }
-    if (!isAdmin && pinVal.length < 6) { setError('비밀번호 6자리를 모두 입력해주세요.'); return }
+    if (!isAdmin && p.length < 6) { setError('비밀번호 6자리를 모두 입력해주세요.'); return }
 
-    setError('')
-    setLoading(true)
-
-    const loginRes = await login(nick.trim(), pinVal)
-    if (loginRes.ok) { navigate('/'); return }
-
-    if (loginRes.error?.includes('저장된 데이터가 없어요')) {
-      const regRes = await register(nick.trim(), pinVal)
-      setLoading(false)
-      if (regRes.ok) navigate('/')
-      else setError(regRes.error ?? '')
-      return
-    }
-
+    setError(''); setShownHint(''); setLoading(true)
+    const res = await login(nick.trim(), p)
     setLoading(false)
-    setError(loginRes.error ?? '')
+
+    if (res.ok) { navigate('/'); return }
+
+    const newFail = loginFailCount + 1
+    setLoginFailCount(newFail)
+
+    if (newFail >= 2 && res.hint) {
+      setShownHint(res.hint)
+    }
+    setError(res.error ?? '로그인에 실패했어요.')
   }
 
-  function handleSmartSubmit() { doSubmit(pin) }
+  /* ── 간편가입 ── */
+  async function doRegister() {
+    if (loading) return
+    if (!nick.trim()) { setError('닉네임을 입력해주세요.'); return }
+    if (pin.length < 6) { setError('비밀번호 6자리를 모두 입력해주세요.'); return }
 
+    setError(''); setLoading(true)
+    const res = await register(nick.trim(), pin, hintInput.trim() || undefined)
+    setLoading(false)
+
+    if (res.ok) navigate('/')
+    else setError(res.error ?? '')
+  }
+
+  /* ── PIN 핸들러 ── */
   function handlePinChange(i: number, val: string) {
     const v = val.replace(/\D/, '').slice(0, 1)
     const next = [...pins]; next[i] = v; setPins(next)
     if (v && i < 5) {
       pinRefs.current[i + 1]?.focus()
-    } else if (v && i === 5) {
-      // 마지막 자리 입력 시 자동 로그인
+    } else if (v && i === 5 && mode === 'login') {
       const fullPin = next.join('')
-      if (nick.trim().length >= 2 && fullPin.length === 6) {
-        doSubmit(fullPin)
-      }
+      if (nick.trim().length >= 2 && fullPin.length === 6) doLogin(fullPin)
     }
   }
   function handlePinKey(i: number, e: KeyboardEvent<HTMLInputElement>) {
@@ -63,24 +89,27 @@ export default function AuthPage() {
     const next = Array(6).fill('')
     text.split('').forEach((c, i) => { next[i] = c })
     setPins(next)
-    const fullPin = next.join('')
     pinRefs.current[Math.min(text.length, 5)]?.focus()
-    // 6자리 붙여넣기 시 자동 로그인
-    if (nick.trim().length >= 2 && fullPin.length === 6) {
-      setTimeout(() => doSubmit(fullPin), 50)
+    if (mode === 'login' && nick.trim().length >= 2 && text.length === 6) {
+      setTimeout(() => doLogin(text), 50)
     }
   }
 
-  const pinFilled = pins.filter(Boolean).length
-  const canSubmit = nick.trim().length >= 2 && (isAdmin ? !!adminPw : pinFilled === 6)
+  /* ── 공통 스타일 ── */
+  const pinBoxStyle = (filled: boolean): React.CSSProperties => ({
+    width: 44, height: 52,
+    border: `2px solid ${filled ? 'var(--pk)' : 'var(--gray2)'}`,
+    borderRadius: 12, textAlign: 'center',
+    fontSize: 22, fontWeight: 700,
+    outline: 'none', color: 'var(--text)',
+    transition: 'border-color .15s',
+  })
 
   return (
     <div style={{
       minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
       background: 'linear-gradient(145deg,#ff6b9d 0%,#ff8fab 40%,#c77dff 100%)',
       padding: '20px 20px 40px',
     }}>
@@ -93,13 +122,31 @@ export default function AuthPage() {
 
       {/* Card */}
       <div style={{ background: '#fff', borderRadius: 24, padding: '28px 24px 24px', width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(255,107,157,.25)' }}>
-        {/* Nickname */}
+
+        {/* 모드 탭 */}
+        {!isAdmin && (
+          <div style={{ display: 'flex', marginBottom: 20, border: '1.5px solid var(--gray2)', borderRadius: 12, overflow: 'hidden' }}>
+            {(['login', 'register'] as Mode[]).map(m => (
+              <button key={m} onClick={() => switchMode(m)} style={{
+                flex: 1, padding: '10px 0', border: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: 700,
+                background: mode === m ? 'var(--pk)' : 'transparent',
+                color: mode === m ? '#fff' : 'var(--text2)',
+                transition: 'all .15s',
+              }}>
+                {m === 'login' ? '로그인' : '간편가입'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 닉네임 */}
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--pk)', marginBottom: 6 }}>닉네임</label>
           <input
             style={{ width: '100%', border: '2px solid var(--gray2)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--text)', outline: 'none', boxSizing: 'border-box', transition: 'border-color .15s' }}
             value={nick}
-            onChange={e => { setNick(e.target.value); setError('') }}
+            onChange={e => { setNick(e.target.value); setError(''); setShownHint(''); setLoginFailCount(0) }}
             placeholder='예: 민지&준호'
             maxLength={20}
             onKeyDown={e => e.key === 'Enter' && pinRefs.current[0]?.focus()}
@@ -107,7 +154,7 @@ export default function AuthPage() {
           />
         </div>
 
-        {/* Password */}
+        {/* 비밀번호 */}
         <div style={{ marginBottom: 6 }}>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--pk)', marginBottom: 6 }}>
             {isAdmin ? '관리자 비밀번호' : '비밀번호 (숫자 6자리)'}
@@ -117,7 +164,7 @@ export default function AuthPage() {
               type='password'
               value={adminPw}
               onChange={e => { setAdminPw(e.target.value); setError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleSmartSubmit()}
+              onKeyDown={e => e.key === 'Enter' && doLogin()}
               placeholder='관리자 비밀번호 입력'
               style={{ width: '100%', border: '2px solid var(--pk)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
             />
@@ -127,21 +174,16 @@ export default function AuthPage() {
                 <input
                   key={i}
                   ref={el => { pinRefs.current[i] = el }}
-                  style={{
-                    width: 44, height: 52,
-                    border: `2px solid ${p ? 'var(--pk)' : 'var(--gray2)'}`,
-                    borderRadius: 12, textAlign: 'center',
-                    fontSize: 22, fontWeight: 700,
-                    outline: 'none', color: 'var(--text)',
-                    transition: 'border-color .15s',
-                  }}
+                  style={pinBoxStyle(!!p)}
                   value={p}
                   inputMode='numeric'
                   maxLength={1}
                   onChange={e => handlePinChange(i, e.target.value)}
                   onKeyDown={e => {
                     handlePinKey(i, e)
-                    if (e.key === 'Enter' && pinFilled === 6) handleSmartSubmit()
+                    if (e.key === 'Enter' && pinFilled === 6) {
+                      mode === 'login' ? doLogin() : doRegister()
+                    }
                   }}
                 />
               ))}
@@ -149,25 +191,76 @@ export default function AuthPage() {
           )}
         </div>
 
-        {/* Error */}
-        <div style={{ fontSize: 12, color: '#e03060', minHeight: 18, marginBottom: 12, whiteSpace: 'pre-line', textAlign: 'center' }}>{error}</div>
+        {/* 비밀번호 힌트 입력 (가입 모드) */}
+        {mode === 'register' && !isAdmin && (
+          <div style={{ marginTop: 12, marginBottom: 4 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--pk)', marginBottom: 6 }}>
+              비밀번호 힌트 <span style={{ fontWeight: 400, color: 'var(--text2)' }}>(선택 · 비밀번호 분실 시 도움이 돼요)</span>
+            </label>
+            <input
+              value={hintInput}
+              onChange={e => setHintInput(e.target.value)}
+              placeholder='예: 우리가 처음 만난 날 🗓️'
+              maxLength={40}
+              style={{ width: '100%', border: '2px solid var(--gray2)', borderRadius: 12, padding: '11px 14px', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box', transition: 'border-color .15s' }}
+            />
+          </div>
+        )}
 
-        {/* CTA */}
-        <button
-          onClick={handleSmartSubmit}
-          disabled={loading || !canSubmit}
-          style={{
-            width: '100%', border: 'none', borderRadius: 12, padding: '15px 0',
-            fontSize: 16, fontWeight: 800,
-            cursor: canSubmit && !loading ? 'pointer' : 'not-allowed',
-            background: canSubmit && !loading ? 'linear-gradient(135deg,var(--pk),var(--mn))' : 'var(--gray2)',
-            color: '#fff',
-            transition: 'all .2s',
-            marginBottom: 10,
-          }}
-        >
-          {loading ? '잠시만요...' : '⚡ 로그인 / 가입하기'}
-        </button>
+        {/* 에러 */}
+        <div style={{ fontSize: 12, color: '#e03060', minHeight: 18, marginTop: 10, marginBottom: 4, textAlign: 'center' }}>{error}</div>
+
+        {/* 힌트 박스 (로그인 2회 실패 시) */}
+        {shownHint && (
+          <div style={{ background: '#fff8e1', border: '1.5px solid #ffe082', borderRadius: 10, padding: '10px 14px', marginBottom: 10, fontSize: 13, color: '#7c5c00', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
+            <span><b>비밀번호 힌트</b><br />{shownHint}</span>
+          </div>
+        )}
+
+        {/* 버튼 영역 */}
+        {mode === 'login' ? (
+          <>
+            <button
+              onClick={() => doLogin()}
+              disabled={loading || !canSubmit}
+              style={{
+                width: '100%', border: 'none', borderRadius: 12, padding: '15px 0',
+                fontSize: 16, fontWeight: 800, marginBottom: 8,
+                cursor: canSubmit && !loading ? 'pointer' : 'not-allowed',
+                background: canSubmit && !loading ? 'linear-gradient(135deg,var(--pk),var(--mn))' : 'var(--gray2)',
+                color: '#fff', transition: 'all .2s',
+              }}
+            >
+              {loading ? '잠시만요...' : '⚡ 로그인'}
+            </button>
+            <button
+              onClick={() => switchMode('register')}
+              style={{
+                width: '100%', border: '1.5px solid var(--pk)', borderRadius: 12, padding: '13px 0',
+                fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                background: '#fff', color: 'var(--pk)', marginBottom: 8,
+                transition: 'all .2s',
+              }}
+            >
+              ✨ 간편가입
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={doRegister}
+            disabled={loading || !canSubmit}
+            style={{
+              width: '100%', border: 'none', borderRadius: 12, padding: '15px 0',
+              fontSize: 16, fontWeight: 800, marginBottom: 8,
+              cursor: canSubmit && !loading ? 'pointer' : 'not-allowed',
+              background: canSubmit && !loading ? 'linear-gradient(135deg,#c77dff,var(--pk))' : 'var(--gray2)',
+              color: '#fff', transition: 'all .2s',
+            }}
+          >
+            {loading ? '잠시만요...' : '✨ 간편가입'}
+          </button>
+        )}
 
         <button
           onClick={() => { loginAnon(); navigate('/') }}
@@ -180,9 +273,15 @@ export default function AuthPage() {
           게스트 모드
         </button>
 
-        <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.6 }}>
-          기존 계정이면 비밀번호 입력 즉시 로그인 🙂<br />
-          <span style={{ opacity: .65 }}>처음이면 자동으로 가입됩니다</span>
+        {/* 하단 안내 */}
+        <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.7 }}>
+          {mode === 'login' ? (
+            <>기존 계정 비밀번호 입력 시 로그인됩니다 🙂</>
+          ) : (
+            <>닉네임 + 비밀번호로 데이터가 저장돼요<br />
+              <span style={{ opacity: .65 }}>다른 기기에서도 같은 계정으로 접속 가능해요</span>
+            </>
+          )}
         </div>
       </div>
     </div>

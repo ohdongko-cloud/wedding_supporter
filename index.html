@@ -11,12 +11,22 @@
     <meta property="og:site_name" content="딸깍, 결혼비용 계산기" />
     <meta property="og:title" content="딸깍, 결혼비용 계산기" />
     <meta property="og:description" content="결혼비용부터 일정까지 한 번에 끝" />
-    <meta property="og:image" content="/og-image.png" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="https://weddingsupporter.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="800" />
+    <meta property="og:image:height" content="400" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>
     <script src="https://developers.kakao.com/sdk/js/kakao.min.js"></script>
+    <script>
+      // Kakao SDK 즉시 초기화 (빌드 캐시 영향 없음)
+      document.addEventListener('DOMContentLoaded', function() {
+        if (window.Kakao && !window.Kakao.isInitialized()) {
+          window.Kakao.init('fb3e1e08818730f702f1d031bd760f74');
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

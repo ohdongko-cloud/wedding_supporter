@@ -53,8 +53,7 @@ export default function DashboardPage() {
   const showOnboarding = !isGuest && userData.hasSeenOnboarding === false
 
   useEffect(() => {
-    const posts = BoardService.getPosts()
-    setRecentPosts(posts.slice(0, 4))
+    BoardService.getPosts().then(posts => setRecentPosts(posts.slice(0, 4)))
   }, [])
 
   function completeOnboarding(date: string, budget: number, destination: 'dashboard' | 'calculator') {

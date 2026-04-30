@@ -46,6 +46,7 @@ export default function BoardPage() {
   const location = useLocation()
   const [view, setView] = useState<View>('list')
   const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Post | null>(null)
   const [editData, setEditData] = useState<Partial<Post> | null>(null)
   const [search, setSearch] = useState('')
@@ -60,73 +61,93 @@ export default function BoardPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [shareToast, setShareToast] = useState('')
 
+  /* ── 초기 로드: 마이그레이션 → seed → 포스트 로드 → 직링크 처리 ── */
   useEffect(() => {
-    const allPosts = BoardService.getPosts()
-    setPosts(allPosts)
-    // URL ?post=ID 직링크 처리
-    const params = new URLSearchParams(location.search)
-    const postId = params.get('post')
-    if (postId) {
-      const target = allPosts.find(p => p.id === postId)
-      if (target) {
-        BoardService.incrementView(postId)
-        const updated = BoardService.getPost(postId)
-        setSelected(updated ?? target)
-        setView('detail')
+    async function init() {
+      setLoading(true)
+      await BoardService.migrateFromLocalStorage()
+      await BoardService.seedNotice()
+      const allPosts = await BoardService.getPosts()
+      setPosts(allPosts)
+
+      // URL 직링크 처리: #post-ID 또는 ?post=ID
+      const hashId = location.hash.startsWith('#post-') ? location.hash.slice(6) : null
+      const params = new URLSearchParams(location.search)
+      const postId = hashId || params.get('post')
+      if (postId) {
+        const target = allPosts.find(p => p.id === postId)
+        if (target) {
+          BoardService.incrementView(postId)
+          const updated = await BoardService.getPost(postId)
+          setSelected(updated ?? target)
+          setView('detail')
+        }
       }
+      setLoading(false)
     }
+    init()
   }, []) // eslint-disable-line
 
-  function reload() { setPosts(BoardService.getPosts()) }
+  /* ── list로 돌아올 때 목록 새로고침 ── */
+  useEffect(() => {
+    if (view === 'list') reload()
+  }, [view]) // eslint-disable-line
 
-  function openDetail(post: Post) {
+  async function reload() {
+    const all = await BoardService.getPosts()
+    setPosts(all)
+  }
+
+  async function openDetail(post: Post) {
     BoardService.incrementView(post.id)
-    const updated = BoardService.getPost(post.id)
+    const updated = await BoardService.getPost(post.id)
     setSelected(updated ?? post)
     setView('detail')
-    reload()
   }
 
   function openCreate() { setEditData({ title: '', content: '', isNotice: false }); setAttachments([]); setFileError(''); setView('edit') }
   function openEdit(post: Post) { setEditData({ ...post }); setAttachments(post.attachments ? [...post.attachments] : []); setFileError(''); setView('edit') }
 
-  function submitPost() {
+  async function submitPost() {
     if (!editData?.title?.trim() || !editData?.content?.trim()) return
-    if (editData.id) BoardService.updatePost(editData.id, editData.title, editData.content, attachments)
-    else BoardService.createPost(user.nick, editData.title, editData.content, editData.isNotice || false, attachments)
-    setAttachments([]); reload(); setView('list')
+    if (editData.id) await BoardService.updatePost(editData.id, editData.title, editData.content, attachments)
+    else await BoardService.createPost(user.nick, editData.title, editData.content, editData.isNotice || false, attachments)
+    setAttachments([]); await reload(); setView('list')
   }
 
-  function deletePost(id: string) {
+  async function deletePost(id: string) {
     if (!confirm('글을 삭제할까요?')) return
-    BoardService.deletePost(id); reload(); setView('list')
+    await BoardService.deletePost(id); await reload(); setView('list')
   }
 
-  function addComment() {
+  async function addComment() {
     if (!selected || !commentInput.trim()) return
-    BoardService.addComment(selected.id, user.nick, commentInput.trim())
+    await BoardService.addComment(selected.id, user.nick, commentInput.trim())
     setCommentInput('')
-    const updated = BoardService.getPost(selected.id)
+    const updated = await BoardService.getPost(selected.id)
     if (updated) { setSelected(updated); reload() }
   }
 
-  function deleteComment(idx: number) {
+  async function deleteComment(idx: number) {
     if (!selected) return
-    BoardService.deleteComment(selected.id, idx)
-    const updated = BoardService.getPost(selected.id)
+    await BoardService.deleteComment(selected.id, idx)
+    const updated = await BoardService.getPost(selected.id)
     if (updated) { setSelected(updated); reload() }
   }
 
-  function toggleLike(post: Post) {
+  async function toggleLike(post: Post) {
     const liked = likedIds.has(post.id)
-    BoardService.toggleLike(post.id, !liked)
+    // 낙관적 UI 업데이트
     const newSet = new Set(likedIds)
     liked ? newSet.delete(post.id) : newSet.add(post.id)
     setLikedIds(newSet)
     sessionStorage.setItem(`likes_${user.nick}`, JSON.stringify([...newSet]))
+    setSelected(prev => prev && prev.id === post.id
+      ? { ...prev, likes: Math.max(0, prev.likes + (liked ? -1 : 1)) }
+      : prev)
+    // 서버 반영
+    await BoardService.toggleLike(post.id, !liked)
     reload()
-    const updated = BoardService.getPost(post.id)
-    if (updated && selected?.id === post.id) setSelected(updated)
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -152,8 +173,7 @@ export default function BoardPage() {
   }
 
   function getShareUrl(postId: string) {
-    const base = window.location.origin + window.location.pathname
-    return `${base}?post=${postId}`
+    return `${window.location.origin}/board#post-${postId}`
   }
 
   async function copyLink(postId: string) {
@@ -169,11 +189,15 @@ export default function BoardPage() {
   function shareKakao(post: Post) {
     const url = getShareUrl(post.id)
     const imageUrl = `${window.location.origin}/og-image.png`
-    // 본문 텍스트 미리보기 (HTML 태그 제거, 최대 60자)
     const plainText = post.content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 60)
     const description = plainText || '딸깍, 결혼비용 계산기 게시판'
 
     const kakao = window.Kakao
+    const key = (import.meta.env.VITE_KAKAO_APP_KEY as string | undefined)
+    // lazy init: SDK가 로드됐지만 아직 초기화 안 된 경우 재시도
+    if (kakao && key) {
+      try { if (!kakao.isInitialized()) kakao.init(key) } catch { /* ignore */ }
+    }
     if (kakao && kakao.isInitialized?.()) {
       kakao.Share.sendDefault({
         objectType: 'feed',
@@ -183,17 +207,13 @@ export default function BoardPage() {
           imageUrl,
           link: { mobileWebUrl: url, webUrl: url },
         },
-        buttons: [{ title: '게시글 보기', link: { mobileWebUrl: url, webUrl: url } }],
+        buttons: [{ title: '꿀정보 확인하기', link: { mobileWebUrl: url, webUrl: url } }],
       })
       return
     }
-    // Kakao SDK 미설정 시 Web Share API 사용 (모바일 기본 공유 시트)
-    if (navigator.share) {
-      navigator.share({ title: post.title, text: description, url }).catch(() => {})
-    } else {
-      copyLink(post.id)
-      showToast('링크 복사됨 — 카카오톡에 붙여넣기 해주세요 📋')
-    }
+    // SDK 미초기화 시: 링크 복사 후 안내
+    navigator.clipboard.writeText(url).catch(() => {})
+    showToast('링크 복사됨 📋 카카오톡에 붙여넣기 해주세요')
   }
 
   const filtered = posts.filter(p => p.title.includes(search) || p.author.includes(search))
@@ -201,7 +221,18 @@ export default function BoardPage() {
   const totalPages = Math.ceil(sorted.length / perPage)
   const pagePosts = sorted.slice((page - 1) * perPage, page * perPage)
 
-  /* ---- Edit view ---- */
+  /* ── 로딩 ── */
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'var(--text2)' }}>
+        <div style={{ fontSize: 32, marginBottom: 12, animation: 'spin 1s linear infinite' }}>💍</div>
+        <div style={{ fontSize: 14 }}>게시글을 불러오는 중...</div>
+        <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
+
+  /* ── Edit view ── */
   if (view === 'edit') {
     return (
       <div>
@@ -261,9 +292,9 @@ export default function BoardPage() {
     )
   }
 
-  /* ---- Detail view ---- */
+  /* ── Detail view ── */
   if (view === 'detail' && selected) {
-    const post = BoardService.getPost(selected.id) ?? selected
+    const post = selected
     const isOwner = post.author === user.nick || isAdmin
     return (
       <div style={{ position: 'relative' }}>
@@ -272,7 +303,7 @@ export default function BoardPage() {
             {shareToast}
           </div>
         )}
-        <button onClick={() => { setView('list'); reload() }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--pk)', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>← 목록으로</button>
+        <button onClick={() => { setView('list') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--pk)', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>← 목록으로</button>
         <div style={{ background: '#fff', borderRadius: 14, padding: '20px', boxShadow: '0 4px 20px rgba(255,107,157,.1)', border: '1.5px solid var(--pk4)', marginBottom: 12 }}>
           {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, marginRight: 8 }}>공지</span>}
           <div style={{ fontSize: 18, fontWeight: 800, margin: post.isNotice ? '10px 0 8px' : '0 0 8px' }}>{post.title}</div>
@@ -305,7 +336,6 @@ export default function BoardPage() {
               ❤️ {post.likes}
             </button>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {/* 공유 버튼 */}
               <button onClick={() => copyLink(post.id)} title="링크 복사" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--gray1)', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: 'var(--text2)' }}>
                 🔗 링크 복사
               </button>
@@ -351,7 +381,7 @@ export default function BoardPage() {
     )
   }
 
-  /* ---- List view ---- */
+  /* ── List view ── */
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { StorageService } from '../services/storage'
 import { BoardService } from '../services/boardService'
@@ -82,9 +82,11 @@ export default function AdminPage() {
   const user = useAuthStore(s => s.user)!
   const [tab, setTab] = useState<Tab>('users')
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
-  const [posts, setPosts] = useState<Post[]>(() => BoardService.getPosts())
+  const [posts, setPosts] = useState<Post[]>([])
   const [analyticsData, setAnalyticsData] = useState<Record<string, number>>(() => AnalyticsService.getAll())
   const [devRequests, setDevRequests] = useState<DevRequest[]>(() => DevRequestService.getAll())
+
+  useEffect(() => { BoardService.getPosts().then(setPosts) }, [])
 
   if (user.nick !== 'admin') {
     return (
@@ -99,10 +101,10 @@ export default function AdminPage() {
     .map(nick => StorageService.get<UserData>(nick.toLowerCase()))
     .filter((u): u is UserData => u !== null && u.nick !== 'admin')
 
-  function deletePost(id: string) {
+  async function deletePost(id: string) {
     if (!confirm('글을 삭제할까요?')) return
-    BoardService.deletePost(id)
-    setPosts(BoardService.getPosts())
+    await BoardService.deletePost(id)
+    BoardService.getPosts().then(setPosts)
   }
 
   function resetAnalytics() {

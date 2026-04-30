@@ -108,7 +108,7 @@ interface AuthState {
   localUpdatedAt: string | null
   isSaving: boolean
   isLoading: boolean
-  login: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string }>
+  login: (nick: string, pin: string) => Promise<{ ok: boolean; error?: string; hint?: string }>
   register: (nick: string, pin: string, pinHint?: string) => Promise<{ ok: boolean; error?: string }>
   loginAnon: () => void
   logout: () => void
@@ -200,7 +200,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (row.pin_hash !== ph) {
           set({ isLoading: false })
           const hint = (row.data as UserData)?.pinHint
-          return { ok: false, error: hint ? `비밀번호가 일치하지 않아요.\n힌트: ${hint}` : '비밀번호가 일치하지 않아요.' }
+          return { ok: false, error: '비밀번호가 일치하지 않아요.', hint: hint || undefined }
         }
         const userData = row.data as UserData
         userData.lastLoginAt = new Date().toISOString()
@@ -217,7 +217,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (saved.pinHash !== ph) {
       set({ isLoading: false })
       const hint = saved.pinHint
-      return { ok: false, error: hint ? `비밀번호가 일치하지 않아요.\n힌트: ${hint}` : '비밀번호가 일치하지 않아요.' }
+      return { ok: false, error: '비밀번호가 일치하지 않아요.', hint: hint || undefined }
     }
     saved.lastLoginAt = new Date().toISOString()
     StorageService.set(userKey(nick), saved)

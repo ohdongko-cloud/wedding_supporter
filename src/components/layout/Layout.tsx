@@ -261,7 +261,7 @@ export default function Layout({ children }: LayoutProps) {
             </>
           )}
           <button onClick={() => { setSideOpen(false); setDevRequestOpen(true) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}>
-            <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>💬</span>개발 요청
+            <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>💬</span>개선 요청
           </button>
           {isGuest ? (
             <button onClick={() => { setSideOpen(false); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: 'var(--pk)' }}>
