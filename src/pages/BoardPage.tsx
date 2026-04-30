@@ -34,6 +34,9 @@ function getFileIcon(type: string) {
 }
 
 type View = 'list' | 'detail' | 'edit'
+type Category = '전체' | '주인장 공유' | '꿀팁 정보' | '결혼후기'
+const CATEGORIES: Category[] = ['전체', '주인장 공유', '꿀팁 정보', '결혼후기']
+const CAT_ICONS: Record<Category, string> = { '전체': '📋', '주인장 공유': '👑', '꿀팁 정보': '💡', '결혼후기': '💌' }
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -60,6 +63,7 @@ export default function BoardPage() {
   const [fileError, setFileError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [shareToast, setShareToast] = useState('')
+  const [activeCategory, setActiveCategory] = useState<Category>('전체')
 
   /* ── 초기 로드: 마이그레이션 → seed → 포스트 로드 → 직링크 처리 ── */
   useEffect(() => {
@@ -105,13 +109,17 @@ export default function BoardPage() {
     setView('detail')
   }
 
-  function openCreate() { setEditData({ title: '', content: '', isNotice: false }); setAttachments([]); setFileError(''); setView('edit') }
+  function openCreate() {
+    const defaultCat: string = activeCategory === '전체' ? '꿀팁 정보' : activeCategory
+    setEditData({ title: '', content: '', isNotice: false, category: defaultCat })
+    setAttachments([]); setFileError(''); setView('edit')
+  }
   function openEdit(post: Post) { setEditData({ ...post }); setAttachments(post.attachments ? [...post.attachments] : []); setFileError(''); setView('edit') }
 
   async function submitPost() {
     if (!editData?.title?.trim() || !editData?.content?.trim()) return
     if (editData.id) await BoardService.updatePost(editData.id, editData.title, editData.content, attachments)
-    else await BoardService.createPost(user.nick, editData.title, editData.content, editData.isNotice || false, attachments)
+    else await BoardService.createPost(user.nick, editData.title, editData.content, editData.isNotice || false, attachments, editData.category || '꿀팁 정보')
     setAttachments([]); await reload(); setView('list')
   }
 
@@ -216,7 +224,13 @@ export default function BoardPage() {
     showToast('링크 복사됨 📋 카카오톡에 붙여넣기 해주세요')
   }
 
-  const filtered = posts.filter(p => p.title.includes(search) || p.author.includes(search))
+  const filtered = posts.filter(p => {
+    const matchSearch = p.title.includes(search) || p.author.includes(search)
+    if (!matchSearch) return false
+    if (p.isNotice) return true  // 공지는 모든 탭에 표시
+    if (activeCategory === '전체') return true
+    return (p.category || '꿀팁 정보') === activeCategory
+  })
   const sorted = [...filtered.filter(p => p.isNotice), ...filtered.filter(p => !p.isNotice)]
   const totalPages = Math.ceil(sorted.length / perPage)
   const pagePosts = sorted.slice((page - 1) * perPage, page * perPage)
@@ -239,6 +253,21 @@ export default function BoardPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--pk)' }}>←</button>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{editData?.id ? '글 수정' : '글 작성'}</span>
+        </div>
+        {/* 카테고리 선택 */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--pk)', marginBottom: 6 }}>카테고리</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {(['주인장 공유', '꿀팁 정보', '결혼후기'] as const).map(cat => (
+              <button key={cat} onClick={() => setEditData(p => ({ ...p!, category: cat }))}
+                style={{ padding: '6px 14px', borderRadius: 20, border: '1.5px solid', fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all .15s',
+                  borderColor: (editData?.category || '꿀팁 정보') === cat ? 'var(--pk)' : 'var(--gray2)',
+                  background: (editData?.category || '꿀팁 정보') === cat ? 'var(--pk)' : '#fff',
+                  color: (editData?.category || '꿀팁 정보') === cat ? '#fff' : 'var(--text2)' }}>
+                {CAT_ICONS[cat as Category]} {cat}
+              </button>
+            ))}
+          </div>
         </div>
         {isAdmin && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, fontWeight: 600, color: 'var(--pk)', cursor: 'pointer' }}>
@@ -305,8 +334,11 @@ export default function BoardPage() {
         )}
         <button onClick={() => { setView('list') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--pk)', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>← 목록으로</button>
         <div style={{ background: '#fff', borderRadius: 14, padding: '20px', boxShadow: '0 4px 20px rgba(255,107,157,.1)', border: '1.5px solid var(--pk4)', marginBottom: 12 }}>
-          {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, marginRight: 8 }}>공지</span>}
-          <div style={{ fontSize: 18, fontWeight: 800, margin: post.isNotice ? '10px 0 8px' : '0 0 8px' }}>{post.title}</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>공지</span>}
+            {!post.isNotice && post.category && <span style={{ background: 'var(--pk5)', color: 'var(--pk)', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, border: '1px solid var(--pk4)' }}>{CAT_ICONS[post.category as Category] || ''} {post.category}</span>}
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{post.title}</div>
           <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
             <span>{displayAuthor(post.author)}</span><span>{fmtDate(post.createdAt)}</span><span>조회 {post.views}</span>
           </div>
@@ -384,6 +416,18 @@ export default function BoardPage() {
   /* ── List view ── */
   return (
     <div>
+      {/* 카테고리 탭 */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 14, border: '1.5px solid var(--gray2)', borderRadius: 12, overflow: 'hidden' }}>
+        {CATEGORIES.map(cat => (
+          <button key={cat} onClick={() => { setActiveCategory(cat); setPage(1) }}
+            style={{ flex: 1, padding: '9px 4px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, transition: 'all .15s',
+              background: activeCategory === cat ? 'var(--pk)' : 'transparent',
+              color: activeCategory === cat ? '#fff' : 'var(--text2)' }}>
+            {CAT_ICONS[cat]}<br /><span style={{ fontSize: 10, fontWeight: 600 }}>{cat}</span>
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input
           value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -405,6 +449,9 @@ export default function BoardPage() {
           <div key={post.id} onClick={() => openDetail(post)} style={{ padding: '13px 16px', borderBottom: idx < pagePosts.length - 1 ? '1px solid var(--gray1)' : 'none', cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
               {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>공지</span>}
+              {!post.isNotice && activeCategory === '전체' && post.category && (
+                <span style={{ background: 'var(--pk5)', color: 'var(--pk)', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, flexShrink: 0, border: '1px solid var(--pk4)' }}>{post.category}</span>
+              )}
               <span style={{ fontSize: 14, fontWeight: post.isNotice ? 800 : 600, flex: 1 }}>{post.title}</span>
               {post.comments.length > 0 && <span style={{ fontSize: 12, color: 'var(--pk)', fontWeight: 700, flexShrink: 0 }}>[{post.comments.length}]</span>}
             </div>

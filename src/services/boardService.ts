@@ -18,6 +18,7 @@ interface BoardRow {
   attachments: PostAttachment[]
   created_at: string
   updated_at: string | null
+  category?: string
 }
 
 function rowToPost(row: BoardRow): Post {
@@ -33,6 +34,7 @@ function rowToPost(row: BoardRow): Post {
     attachments: (row.attachments as unknown as PostAttachment[]) || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? undefined,
+    category: row.category ?? '꿀팁 정보',
   }
 }
 
@@ -150,14 +152,14 @@ export const BoardService = {
   /* ── Write ──────────────────────────────────────────────────── */
   async createPost(
     author: string, title: string, content: string,
-    isNotice = false, attachments: PostAttachment[] = []
+    isNotice = false, attachments: PostAttachment[] = [], category = '꿀팁 정보'
   ): Promise<Post> {
     const now = new Date().toISOString()
     if (!supabase) {
       const local = loadLocal()
       const post: Post = {
         id: String(local.nextId++), title, content, author, isNotice,
-        views: 0, likes: 0, comments: [], createdAt: now, attachments,
+        views: 0, likes: 0, comments: [], createdAt: now, attachments, category,
       }
       local.posts.unshift(post); saveLocal(local); return post
     }
@@ -165,7 +167,7 @@ export const BoardService = {
     const { data, error } = await supabase
       .from('board_posts')
       // Supabase에는 attachments base64 제외 (크기 제한)
-      .insert({ id, title, content, author, is_notice: isNotice, views: 0, likes: 0, comments: [], attachments: [], created_at: now })
+      .insert({ id, title, content, author, is_notice: isNotice, views: 0, likes: 0, comments: [], attachments: [], created_at: now, category })
       .select().single()
     if (error || !data) throw new Error(error?.message ?? 'create failed')
     // 반환 Post에 원본 attachments 복원 (현재 기기에서만 사용 가능)
@@ -260,7 +262,7 @@ export const BoardService = {
       const notice: Post = {
         id: 'notice-1', title: NOTICE_TITLE, content: NOTICE_CONTENT,
         author: 'admin', isNotice: true, views: 0, likes: 0, comments: [],
-        createdAt: '2026-04-29T00:00:00.000Z',
+        createdAt: '2026-04-29T00:00:00.000Z', category: '공지',
       }
       local.posts.unshift(notice); saveLocal(local); return
     }
@@ -269,7 +271,7 @@ export const BoardService = {
     await supabase.from('board_posts').insert({
       id: 'notice-1', title: NOTICE_TITLE, content: NOTICE_CONTENT,
       author: 'admin', is_notice: true, views: 0, likes: 0, comments: [], attachments: [],
-      created_at: '2026-04-29T00:00:00.000Z',
+      created_at: '2026-04-29T00:00:00.000Z', category: '공지',
     })
   },
 

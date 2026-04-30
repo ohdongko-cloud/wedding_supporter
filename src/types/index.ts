@@ -29,6 +29,7 @@ export interface Post {
   id: string; title: string; content: string; author: string; isNotice: boolean
   views: number; likes: number; comments: Comment[]; createdAt: string; updatedAt?: string
   attachments?: PostAttachment[]
+  category?: string
 }
 export interface HouseDetailBuy {
   targetContract: string; region: string; price: string
