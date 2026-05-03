@@ -12,6 +12,8 @@ import BoardPage from './pages/BoardPage'
 import MemoPage from './pages/MemoPage'
 import AdminPage from './pages/AdminPage'
 import SharedViewPage from './pages/SharedViewPage'
+import PrivacyPage from './pages/PrivacyPage'
+import DeleteAccountPage from './pages/DeleteAccountPage'
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
@@ -28,6 +30,8 @@ export default function App() {
     <Routes>
       <Route path='/auth' element={(user && user.nick !== '게스트') ? <Navigate to='/' replace /> : <AuthPage />} />
       <Route path='/view/:shareToken' element={<SharedViewPage />} />
+      <Route path='/privacy' element={<PrivacyPage />} />
+      <Route path='/delete-account' element={<DeleteAccountPage />} />
       <Route path='/*' element={
           <Layout>
             <Routes>
