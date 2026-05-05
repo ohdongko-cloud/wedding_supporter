@@ -292,6 +292,75 @@ function SumRow({ label, value, highlight, color }: { label: string; value: stri
   )
 }
 
+// ── 대출 우대 조건 설정 ──────────────────────────────────────────────────────────
+
+interface LoanConditionDef {
+  key: string
+  label: string
+  emoji: string
+  ltvBonusPct: number   // 규제지역 LTV에 더하는 %p
+  maxLtvPct: number     // 최대 LTV 상한 (%)
+  loanCapMan: number    // 대출 한도 (만원, 0 = 무제한)
+  note: string          // 요건 요약
+}
+
+const LOAN_CONDITIONS: LoanConditionDef[] = [
+  {
+    key: '일반',
+    label: '일반',
+    emoji: '🏠',
+    ltvBonusPct: 0,
+    maxLtvPct: 70,
+    loanCapMan: 0,
+    note: '규제지역 LTV 그대로 적용 (투기과열 40% · 조정 50% · 비규제 70%)',
+  },
+  {
+    key: '생애최초',
+    label: '생애최초',
+    emoji: '🔑',
+    ltvBonusPct: 10,
+    maxLtvPct: 80,
+    loanCapMan: 0,
+    note: '9억원 이하 주택 · LTV 최대 80% · 취득세 감면 혜택',
+  },
+  {
+    key: '신혼부부특례',
+    label: '신혼부부 특례',
+    emoji: '💑',
+    ltvBonusPct: 10,
+    maxLtvPct: 80,
+    loanCapMan: 40000,
+    note: '합산소득 8,500만↓ · 6억↓ 주택 · 한도 4억 · 금리 1.85~3.0%',
+  },
+  {
+    key: '디딤돌',
+    label: '디딤돌 대출',
+    emoji: '🏗️',
+    ltvBonusPct: 0,
+    maxLtvPct: 70,
+    loanCapMan: 25000,
+    note: '합산소득 6,000만↓ · 5억↓ 주택 · 한도 2.5억 · 금리 2.15~3.55%',
+  },
+  {
+    key: '보금자리론',
+    label: '보금자리론',
+    emoji: '🏡',
+    ltvBonusPct: 0,
+    maxLtvPct: 70,
+    loanCapMan: 36000,
+    note: '합산소득 7,000만↓ · 6억↓ 주택 · 한도 3.6억 · 장기고정금리 4%대',
+  },
+  {
+    key: '청년디딤돌',
+    label: '청년 디딤돌',
+    emoji: '🎓',
+    ltvBonusPct: 10,
+    maxLtvPct: 80,
+    loanCapMan: 25000,
+    note: '만 19~34세 · 연소득 3,500만↓ · 5억↓ 주택 · 한도 2.5억 · 금리 우대',
+  },
+]
+
 // ── BuyTab ────────────────────────────────────────────────────────────────────
 
 function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseDetailBuy) => void }) {
@@ -310,14 +379,16 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
   const loanYears = num(data.loanYears) || 30
   const reg = data.region ? getRegulation(data.region) : null
 
-  // 대출 조건 보너스 LTV (생애최초/신혼부부 +10%p, max 80%)
-  const loanConditionBonus = (data.loanCondition === '생애최초' || data.loanCondition === '신혼부부') ? 10 : 0
-  const effectiveLtvPct = reg ? Math.min(reg.ltvPct + loanConditionBonus, 80) : 0
+  // 선택된 대출 조건 설정
+  const condDef = LOAN_CONDITIONS.find(c => c.key === (data.loanCondition ?? '일반')) ?? LOAN_CONDITIONS[0]
+  const effectiveLtvPct = reg ? Math.min(reg.ltvPct + condDef.ltvBonusPct, condDef.maxLtvPct) : 0
 
   const acquisitionTax = price > 0 ? Math.round(price * acquisitionTaxRate(price)) : 0
   const agentFee = price > 0 ? Math.round(buyAgentFee(price)) : 0
 
-  const maxLoanLtv = effectiveLtvPct > 0 && price > 0 ? Math.round(price * effectiveLtvPct / 100) : 0
+  // LTV 기반 최대 대출 (대출 한도 적용)
+  const maxLoanLtvRaw = effectiveLtvPct > 0 && price > 0 ? Math.round(price * effectiveLtvPct / 100) : 0
+  const maxLoanLtv = condDef.loanCapMan > 0 ? Math.min(maxLoanLtvRaw, condDef.loanCapMan) : maxLoanLtvRaw
 
   const totalIncome = num(data.incomeGroom) + num(data.incomeBride)
   // 기존 보유 대출의 월 상환액 (신랑 + 신부 합산)
@@ -360,13 +431,13 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
   const tableRows = useMemo(() => {
     if (!effectiveLtvPct) return []
     return Array.from({ length: 29 }, (_, i) => {
-      const p = (i + 2) * 10000 // 만원
+      const p = (i + 2) * 10000
       const tax = Math.round(p * acquisitionTaxRate(p))
       const fee = Math.round(buyAgentFee(p))
-      const maxL = Math.round(p * effectiveLtvPct / 100)           // LTV 기반 최대 대출
-      const actualL = maxLoanDsr > 0 ? Math.min(maxL, maxLoanDsr) : maxL // 실질 대출
-      const needCash = p - actualL + tax + fee                     // 필요 현금 (실질 대출 반영)
-      // DSR% = 실질대출 월상환액 / 월소득
+      const maxLRaw = Math.round(p * effectiveLtvPct / 100)
+      const maxL = condDef.loanCapMan > 0 ? Math.min(maxLRaw, condDef.loanCapMan) : maxLRaw  // 한도 적용
+      const actualL = maxLoanDsr > 0 ? Math.min(maxL, maxLoanDsr) : maxL
+      const needCash = p - actualL + tax + fee
       let dsrPct = 0
       if (totalIncome > 0 && actualL > 0 && loanRate > 0) {
         const mp = monthlyPayment(actualL * 10000, loanRate, loanYears, data.repaymentMethod)
@@ -374,7 +445,7 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
       }
       return { p, tax, fee, needCash, maxL, actualL, ltv: effectiveLtvPct, dsrPct }
     })
-  }, [effectiveLtvPct, maxLoanDsr, totalIncome, loanRate, loanYears, data.repaymentMethod])
+  }, [effectiveLtvPct, condDef.loanCapMan, maxLoanDsr, totalIncome, loanRate, loanYears, data.repaymentMethod])
 
   return (
     <div>
@@ -436,22 +507,33 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
           </TwoCol>
         </FormRow>
         <FormRow label="대출 우대 조건">
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-            {(['일반', '생애최초', '신혼부부'] as const).map(c => (
-              <button key={c} onClick={() => set('loanCondition', c)}
-                style={{ padding: '6px 14px', borderRadius: 20, border: '1.5px solid', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                  borderColor: (data.loanCondition ?? '일반') === c ? 'var(--pk)' : 'var(--gray2)',
-                  background: (data.loanCondition ?? '일반') === c ? 'var(--pk)' : '#fff',
-                  color: (data.loanCondition ?? '일반') === c ? '#fff' : 'var(--text2)' }}>
-                {c}
-              </button>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+            {LOAN_CONDITIONS.map(c => {
+              const selected = (data.loanCondition ?? '일반') === c.key
+              return (
+                <button key={c.key} onClick={() => set('loanCondition', c.key)}
+                  style={{ padding: '7px 4px', borderRadius: 10, border: '1.5px solid', fontSize: 11, fontWeight: 700, cursor: 'pointer', textAlign: 'center', lineHeight: 1.3,
+                    borderColor: selected ? 'var(--pk)' : 'var(--gray2)',
+                    background: selected ? 'var(--pk)' : '#fff',
+                    color: selected ? '#fff' : 'var(--text2)' }}>
+                  <div style={{ fontSize: 14, marginBottom: 2 }}>{c.emoji}</div>
+                  {c.label}
+                </button>
+              )
+            })}
           </div>
-          {(data.loanCondition === '생애최초' || data.loanCondition === '신혼부부') && (
-            <div style={{ fontSize: 11, color: 'var(--pk)', background: 'var(--pk5)', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
-              우대 조건 적용 시 LTV +10%p (최대 80%) 적용됩니다.
-            </div>
-          )}
+          {/* 선택된 조건 상세 설명 */}
+          <div style={{ fontSize: 11, borderRadius: 8, padding: '8px 10px', marginBottom: 10, background: 'var(--pk5)', border: '1px solid var(--pk4)' }}>
+            <div style={{ fontWeight: 800, color: 'var(--pk)', marginBottom: 3 }}>{condDef.emoji} {condDef.label}</div>
+            <div style={{ color: 'var(--text2)', lineHeight: 1.6 }}>{condDef.note}</div>
+            {condDef.ltvBonusPct > 0 && (
+              <div style={{ color: 'var(--mn)', marginTop: 3 }}>→ LTV +{condDef.ltvBonusPct}%p (최대 {condDef.maxLtvPct}%)</div>
+            )}
+            {condDef.loanCapMan > 0 && (
+              <div style={{ color: '#e03060', marginTop: 2 }}>→ 대출 한도 {fmt(condDef.loanCapMan)}원 상한</div>
+            )}
+            <div style={{ color: 'var(--text2)', marginTop: 4, fontSize: 10 }}>※ 소득·주택가격 요건 등 실제 적용 시 금융기관 확인 필요</div>
+          </div>
           <TwoCol>
             <div>
               <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>금리 (%)</div>
@@ -495,7 +577,10 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
         <SumRow label="예상 매매가" value={price > 0 ? fmtWon(price) : '-'} />
         <SumRow label="취득세 (등록세 포함)" value={price > 0 ? fmtWon(acquisitionTax) : '-'} />
         <SumRow label="중개수수료" value={price > 0 ? fmtWon(agentFee) : '-'} />
-        <SumRow label={`최대 대출 (LTV ${effectiveLtvPct}%)`} value={maxLoanLtv > 0 ? fmtWon(maxLoanLtv) : '-'} />
+        <SumRow
+          label={`최대 대출 (LTV ${effectiveLtvPct}%${condDef.loanCapMan > 0 ? ` · 한도 ${fmt(condDef.loanCapMan)}원` : ''})`}
+          value={maxLoanLtv > 0 ? fmtWon(maxLoanLtv) : '-'}
+        />
         {existingLoanAmt > 0 && <SumRow label="기존 대출 월 상환액" value={existingMonthly > 0 ? fmtWon(existingMonthly) + '/월' : '-'} />}
         <SumRow label="DSR 기준 신규 대출 한도" value={maxLoanDsr > 0 ? fmtWon(maxLoanDsr) : (totalIncome > 0 ? '-' : '연소득 입력 필요')} />
         <SumRow label="실질 대출 예상액" value={actualLoan > 0 ? fmtWon(actualLoan) : '-'} highlight />
