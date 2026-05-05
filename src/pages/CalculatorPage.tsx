@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuthStore } from '../stores/authStore'
-import { CALC_CAT_LABELS, CALC_SEEDS, MEAL_PRICE_OPTIONS } from '../data/calculatorSeeds'
+import { CALC_CAT_LABELS, CALC_SEEDS, MEAL_PRICE_OPTIONS, type WeddingSeedItem } from '../data/calculatorSeeds'
 import { VENUE_LIST, fmtHallLabel, fmtVenuePrice } from '../data/venueSeed'
 import { AnalyticsService } from '../services/analytics'
 import type { CalcState, CalcCustomItem } from '../types'
@@ -11,49 +11,31 @@ import BannerAd from '../components/ads/BannerAd'
 type CalcType = 'wedding' | 'honeymoon' | 'house'
 
 // ── 결혼 스타일 프리셋 ──────────────────────────────────────────
-type WeddingStyle = 'minimal' | 'standard' | 'premium'
+type WeddingStyle = 'simple' | 'basic' | 'luxury'
 
-const STYLE_CHECKED: Record<WeddingStyle, string[]> = {
-  minimal: [
-    'vi1','vi2','vi3','vi5',               // 결혼식장: 본식촬영·혼주헤어·사회자·부케
-    'st1','st14',                           // 스튜디오: 웨딩촬영·스냅
-    'dr2','dr9','dr13',                     // 드레스: 본식헬퍼·드레스지정·턱시도
-    'mk1','mk2',                            // 메이크업: 여성·남성 혼주
-    'et1','et2','et6',                      // 기타: 청첩장·반지·답례품
-  ],
-  standard: [
-    'vi1','vi2','vi3','vi4','vi5','vi6',   // + 축가·폐백음식
-    'st1','st14',
-    'dr2','dr9','dr13',
-    'mk1','mk2',
-    'et1','et2','et6',
-  ],
-  premium: [
-    'vi1','vi2','vi3','vi4','vi5','vi6','vi7','vi8','vi9','vi10','vi11','vi12','vi13','vi14','vi15','vi16','vi17',
-    'st1','st2','st3','st5','st6','st8','st9','st14',
-    'dr2','dr5','dr6','dr7','dr9','dr11','dr13',
-    'mk1','mk2','mk3','mk4','mk5','mk7',
-    'et1','et2','et3','et5','et6',
-  ],
-}
 const STYLE_MEAL: Record<WeddingStyle, { count: number; price: number }> = {
-  minimal:  { count: 150, price: 66000 },
-  standard: { count: 200, price: 77000 },
-  premium:  { count: 350, price: 99000 },
+  simple: { count: 150, price: 66000 },
+  basic:  { count: 200, price: 77000 },
+  luxury: { count: 350, price: 99000 },
+}
+const STYLE_VENUE: Record<WeddingStyle, number> = {
+  simple: 200,
+  basic:  500,
+  luxury: 1200,
 }
 
 function WeddingStylePicker({ onSelect, onSkip }: { onSelect: (s: WeddingStyle) => void; onSkip: () => void }) {
   const STYLES: { key: WeddingStyle; emoji: string; title: string; desc: string; color: string }[] = [
-    { key: 'minimal',  emoji: '🌿', title: '초심플 미니멀', desc: '필수 항목만 체크 · 150명 · 6.6만원/인', color: '#e8f5e9' },
-    { key: 'standard', emoji: '💍', title: '기본 충실한 결혼', desc: '인기 항목 포함 · 200명 · 7.7만원/인', color: 'var(--pk5)' },
-    { key: 'premium',  emoji: '👑', title: '풀스택 호화 결혼', desc: '모든 항목 체크 · 350명 · 9.9만원/인', color: '#fff8e1' },
+    { key: 'simple',  emoji: '💚', title: '심플 미니멀',   desc: '꼭 필요한 것만 · 150명 · 6.6만원/인 · 가성비 집중', color: '#f0faf4' },
+    { key: 'basic',   emoji: '💛', title: '베이직 스탠다드', desc: '전국 평균 수준 · 200명 · 7.7만원/인 · 알찬 구성',  color: 'var(--pk5)' },
+    { key: 'luxury',  emoji: '❤️', title: '럭셔리 프리미엄', desc: '최고급 서비스 · 350명 · 9.9만원/인 · 풀 구성',    color: '#fff8e1' },
   ]
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 360, padding: '28px 20px', boxShadow: '0 24px 80px rgba(0,0,0,.25)' }}>
         <div style={{ fontSize: 22, textAlign: 'center', marginBottom: 8 }}>💒</div>
         <div style={{ fontSize: 18, fontWeight: 800, textAlign: 'center', marginBottom: 4 }}>어떤 스타일의 결혼을 준비 중이에요?</div>
-        <div style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', marginBottom: 20 }}>선택하면 맞춤 항목이 자동으로 세팅돼요 ✨</div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', marginBottom: 20 }}>선택하면 맞춤 항목과 가격이 자동 세팅돼요 ✨</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {STYLES.map(s => (
             <button key={s.key} onClick={() => onSelect(s.key)}
@@ -75,11 +57,51 @@ function WeddingStylePicker({ onSelect, onSkip }: { onSelect: (s: WeddingStyle) 
   )
 }
 
+// ── 항목 설명 팝업 ──────────────────────────────────────────────
+interface InfoPopupData { name: string; required?: boolean; prepStage?: string; description: string }
+
+function InfoPopup({ data, onClose }: { data: InfoPopupData; onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 400, padding: '22px 20px', boxShadow: '0 24px 80px rgba(0,0,0,.3)', maxHeight: '80vh', overflowY: 'auto' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+              background: data.required ? 'var(--pk5)' : '#f3f4f6',
+              color: data.required ? 'var(--pk)' : 'var(--text2)' }}>
+              {data.required ? '★ 필수항목' : '☆ 선택항목'}
+            </span>
+            {data.prepStage && (
+              <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 6 }}>⏱ {data.prepStage}</span>
+            )}
+            <div style={{ fontSize: 16, fontWeight: 800, marginTop: 8, color: 'var(--text)' }}>{data.name}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text2)', padding: '0 0 0 8px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+        </div>
+        <div style={{ height: 1, background: 'var(--gray1)', marginBottom: 14 }} />
+        <div style={{ fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-line', color: 'var(--text)' }}>
+          {data.description || '항목 설명이 없습니다.'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // n is in 만원
 function fmt(n: number) {
   if (n === 0) return '0만원'
   if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(1)}억원`
   return `${n.toLocaleString()}만원`
+}
+
+// 웨딩 씨드 item 조회 헬퍼
+function getWeddingSeed(catKey: string, itemId: string): WeddingSeedItem | null {
+  const wSeeds = CALC_SEEDS.wedding as Record<string, WeddingSeedItem[]>
+  const catSeeds = wSeeds[catKey]
+  if (!catSeeds) return null
+  return catSeeds.find(s => s[0] === itemId) ?? null
 }
 
 export default function CalculatorPage() {
@@ -95,6 +117,7 @@ export default function CalculatorPage() {
   const [showStylePicker, setShowStylePicker] = useState(
     calcType === 'wedding' && !!(location.state as any)?.fromOnboarding
   )
+  const [infoPopup, setInfoPopup] = useState<InfoPopupData | null>(null)
 
   const calcKey = calcType === 'wedding' ? 'calcWedding' : calcType === 'honeymoon' ? 'calcHoneymoon' : 'calcHouse'
   const calc = userData[calcKey]
@@ -105,26 +128,55 @@ export default function CalculatorPage() {
     if (!seeds) return
     let changed = false
     const newCats = { ...calc.cats }
+
+    // ① 새 카테고리 초기화 (sdm_common, gifts 등 기존 users에 없을 수 있음)
+    Object.keys(seeds).forEach(catKey => {
+      if (!newCats[catKey]) {
+        newCats[catKey] = { defItems: [], customItems: [] }
+        changed = true
+      }
+    })
+
+    // ② 항목 씨딩/업데이트
     Object.entries(seeds).forEach(([catKey, seedItems]) => {
       const cat = newCats[catKey]
       if (!cat) return
-      // Reinitialize if empty, old 원-based seeds, item count changed, or any name typo
-      const hasOldUnits = cat.defItems.some(it => it.avg >= 10000)
-      const hasNameMismatch = cat.defItems.some(it => {
+
+      const isWeddingSeed = seedItems.length > 0 && typeof seedItems[0][2] === 'boolean'
+
+      // 재초기화 조건: 빈 배열 / 구 단위(원) / ID 불일치 / 개수 불일치
+      const hasOldUnits    = cat.defItems.some(it => it.avg >= 10000)
+      const hasIdMismatch  = seedItems.some(s => !cat.defItems.find(it => it.id === s[0]))
+                          || cat.defItems.some(it => !seedItems.find(s => s[0] === it.id))
+      const hasCountMismatch = seedItems.length > 0 && cat.defItems.length !== seedItems.length
+      const hasNameMismatch  = cat.defItems.some(it => {
         const seed = seedItems.find(s => s[0] === it.id)
         return seed && seed[1] !== it.name
       })
-      const hasCountMismatch = seedItems.length > 0 && cat.defItems.length !== seedItems.length
-      if (cat.defItems.length === 0 || hasOldUnits || hasNameMismatch || hasCountMismatch) {
-        newCats[catKey] = {
-          ...cat,
-          defItems: seedItems.map(([id, name, avg, defaultOn]) => ({
-            id, name, avg, customVal: '', checked: defaultOn !== false, deleted: false,
-          })),
+
+      if (cat.defItems.length === 0 || hasOldUnits || hasIdMismatch || hasCountMismatch || hasNameMismatch) {
+        if (isWeddingSeed) {
+          newCats[catKey] = {
+            ...cat,
+            defItems: (seedItems as WeddingSeedItem[]).map(s => ({
+              id: s[0], name: s[1], avg: s[7],
+              customVal: '', checked: s[2] === true, deleted: false,
+              required: s[2], prepStage: s[3],
+            })),
+          }
+        } else {
+          newCats[catKey] = {
+            ...cat,
+            defItems: seedItems.map((s: any[]) => ({
+              id: s[0] as string, name: s[1] as string, avg: s[2] as number,
+              customVal: '', checked: s[3] !== false, deleted: false,
+            })),
+          }
         }
         changed = true
       }
     })
+
     if (changed) {
       const recomputed = computeTotal({ ...calc, cats: newCats }, calcType)
       setUserData({ ...userData, [calcKey]: recomputed })
@@ -155,16 +207,38 @@ export default function CalculatorPage() {
   }
 
   function applyStyle(style: WeddingStyle) {
-    const checked = new Set(STYLE_CHECKED[style])
     const meal = STYLE_MEAL[style]
     const newCats = { ...calc.cats }
+
     Object.entries(newCats).forEach(([catKey, cat]) => {
       newCats[catKey] = {
         ...cat,
-        defItems: cat.defItems.map(it => ({ ...it, checked: checked.has(it.id) })),
+        defItems: cat.defItems.map(it => {
+          const seed = getWeddingSeed(catKey, it.id)
+          if (!seed) return it
+
+          if (style === 'simple') {
+            if (seed[4] !== null) {
+              return { ...it, checked: true, customVal: String(seed[4]) }
+            } else {
+              return { ...it, checked: false, customVal: '' }
+            }
+          } else if (style === 'basic') {
+            return { ...it, checked: true, customVal: String(seed[5]) }
+          } else { // luxury
+            return { ...it, checked: true, customVal: String(seed[6]) }
+          }
+        }),
       }
     })
-    updateCalc({ ...calc, cats: newCats, mealCount: meal.count, mealPrice: meal.price })
+
+    updateCalc({
+      ...calc,
+      cats: newCats,
+      mealCount: meal.count,
+      mealPrice: meal.price,
+      venueDirect: STYLE_VENUE[style],
+    })
     setShowStylePicker(false)
   }
 
@@ -247,6 +321,16 @@ export default function CalculatorPage() {
     updateCalc({ ...calc, budget: b })
   }
 
+  function openInfo(catKey: string, it: { id: string; name: string; required?: boolean; prepStage?: string }) {
+    const seed = getWeddingSeed(catKey, it.id)
+    setInfoPopup({
+      name: it.name,
+      required: it.required,
+      prepStage: it.prepStage,
+      description: seed ? seed[8] : '',
+    })
+  }
+
   const catLabels = CALC_CAT_LABELS[calcType] || {}
   const diff = calc.budget - calc.totalCost
   const usedPct = calc.budget > 0 ? Math.min(100, Math.round(calc.totalCost / calc.budget * 100)) : 0
@@ -258,6 +342,8 @@ export default function CalculatorPage() {
       {showStylePicker && calcType === 'wedding' && (
         <WeddingStylePicker onSelect={applyStyle} onSkip={() => setShowStylePicker(false)} />
       )}
+      {infoPopup && <InfoPopup data={infoPopup} onClose={() => setInfoPopup(null)} />}
+
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           {[
@@ -293,7 +379,7 @@ export default function CalculatorPage() {
         </div>
       </div>
 
-      {/* 엑셀 다운로드 버튼 */}
+      {/* 버튼 행 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
         <button onClick={exportExcel}
           style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#fff', border: '1.5px solid #22a55a', borderRadius: 10, padding: '10px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#22a55a' }}>
@@ -377,7 +463,7 @@ export default function CalculatorPage() {
                 </select>
               </div>
 
-              {/* 4. 홀 선택 (예식장 선택 시 노출) */}
+              {/* 4. 홀 선택 */}
               {selectedVenue && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 13, minWidth: 64, color: 'var(--text2)' }}>홀 선택</span>
@@ -440,6 +526,7 @@ export default function CalculatorPage() {
           ...cat.defItems.filter(it => it.checked && !it.deleted).map(it => it.customVal ? Number(it.customVal) || 0 : it.avg),
           ...cat.customItems.filter(it => it.checked).map(it => it.price),
         ].reduce((a, b) => a + b, 0)
+        const isWeddingCat = calcType === 'wedding'
 
         return (
           <div key={catKey} style={{ background: '#fff', borderRadius: 14, marginBottom: 10, boxShadow: '0 4px 20px rgba(255,107,157,.08)', overflow: 'hidden', border: '1.5px solid var(--pk4)' }}>
@@ -454,32 +541,68 @@ export default function CalculatorPage() {
             {isOpen && (
               <div style={{ padding: '0 12px 12px' }}>
                 {cat.defItems.filter(it => !it.deleted).map(it => (
-                  <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', borderBottom: '1px solid var(--gray1)' }}>
-                    <input type='checkbox' checked={it.checked} onChange={() => toggleDef(catKey, it.id)} style={{ width: 17, height: 17, accentColor: 'var(--pk)', cursor: 'pointer', flexShrink: 0 }} />
-                    <span style={{ flex: 1, fontSize: 13, color: it.checked ? 'var(--text)' : 'var(--text2)' }}>{it.name}</span>
+                  <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 4px', borderBottom: '1px solid var(--gray1)' }}>
+                    {/* 체크박스 */}
+                    <input type='checkbox' checked={it.checked} onChange={() => toggleDef(catKey, it.id)}
+                      style={{ width: 17, height: 17, accentColor: 'var(--pk)', cursor: 'pointer', flexShrink: 0 }} />
+
+                    {/* 필수/선택 뱃지 (wedding만) */}
+                    {isWeddingCat && it.required !== undefined && (
+                      <span style={{ fontSize: 11, flexShrink: 0, color: it.required ? 'var(--pk)' : '#bbb', lineHeight: 1 }}>
+                        {it.required ? '★' : '☆'}
+                      </span>
+                    )}
+
+                    {/* 항목명 + 준비시점 */}
+                    <span style={{ flex: 1, fontSize: 12, color: it.checked ? 'var(--text)' : 'var(--text2)', lineHeight: 1.4 }}>
+                      {it.name}
+                      {isWeddingCat && it.prepStage && (
+                        <span style={{ color: 'var(--text2)', fontSize: 11 }}> ({it.prepStage})</span>
+                      )}
+                    </span>
+
+                    {/* ⓘ 설명 버튼 (wedding만) */}
+                    {isWeddingCat && (
+                      <button
+                        onClick={e => { e.stopPropagation(); openInfo(catKey, it) }}
+                        title='항목 설명 보기'
+                        style={{
+                          flexShrink: 0, width: 20, height: 20, borderRadius: '50%',
+                          border: '1.5px solid #c5d0f0', background: '#eef2ff',
+                          color: '#5570c6', fontSize: 11, fontWeight: 900,
+                          cursor: 'pointer', padding: 0, lineHeight: '17px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >i</button>
+                    )}
+
+                    {/* 금액 입력 */}
                     <input
                       type='number'
                       value={it.customVal !== '' ? it.customVal : it.avg}
                       onChange={e => setDefAmt(catKey, it.id, e.target.value)}
-                      style={{ width: 80, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 8px', fontSize: 12, textAlign: 'right', opacity: it.checked ? 1 : 0.45, outline: 'none' }}
+                      style={{ width: 56, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 6px', fontSize: 12, textAlign: 'right', opacity: it.checked ? 1 : 0.45, outline: 'none', flexShrink: 0 }}
                     />
-                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 22 }}>만원</span>
-                    <button onClick={() => deleteDefItem(catKey, it.id)} title='행 삭제' style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 14, padding: '2px', flexShrink: 0, lineHeight: 1 }}>✕</button>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 22, flexShrink: 0 }}>만원</span>
+                    <button onClick={() => deleteDefItem(catKey, it.id)} title='행 삭제'
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 14, padding: '2px', flexShrink: 0, lineHeight: 1 }}>✕</button>
                   </div>
                 ))}
 
                 {cat.customItems.map(it => (
-                  <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', borderBottom: '1px solid var(--gray1)' }}>
-                    <input type='checkbox' checked={it.checked} onChange={() => toggleCustom(catKey, it.id)} style={{ width: 17, height: 17, accentColor: 'var(--pk)', cursor: 'pointer', flexShrink: 0 }} />
-                    <span style={{ flex: 1, fontSize: 13 }}>{it.name}</span>
+                  <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 4px', borderBottom: '1px solid var(--gray1)' }}>
+                    <input type='checkbox' checked={it.checked} onChange={() => toggleCustom(catKey, it.id)}
+                      style={{ width: 17, height: 17, accentColor: 'var(--pk)', cursor: 'pointer', flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 12 }}>{it.name}</span>
                     <input
                       type='number'
                       value={it.price}
                       onChange={e => setCustomAmt(catKey, it.id, e.target.value)}
-                      style={{ width: 80, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 8px', fontSize: 12, textAlign: 'right', outline: 'none' }}
+                      style={{ width: 56, border: '1.5px solid var(--gray2)', borderRadius: 6, padding: '4px 6px', fontSize: 12, textAlign: 'right', outline: 'none', flexShrink: 0 }}
                     />
-                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 22 }}>만원</span>
-                    <button onClick={() => delCustom(catKey, it.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--pk3)', fontSize: 14, padding: '2px' }}>🗑️</button>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 22, flexShrink: 0 }}>만원</span>
+                    <button onClick={() => delCustom(catKey, it.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--pk3)', fontSize: 14, padding: '2px', flexShrink: 0 }}>🗑️</button>
                   </div>
                 ))}
 
@@ -491,7 +614,8 @@ export default function CalculatorPage() {
                     onChange={e => setAddInputs(p => ({ ...p, [catKey]: e.target.value }))}
                     onKeyDown={e => e.key === 'Enter' && addCustom(catKey)}
                   />
-                  <button onClick={() => addCustom(catKey)} style={{ background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>추가</button>
+                  <button onClick={() => addCustom(catKey)}
+                    style={{ background: 'var(--pk)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>추가</button>
                 </div>
               </div>
             )}

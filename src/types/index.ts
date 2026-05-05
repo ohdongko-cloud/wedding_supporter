@@ -9,7 +9,11 @@ export interface ChecklistSeedStage { id: string; name: string; icon: string; it
 export interface ChecklistItemState { id: string; completed: boolean; hidden: boolean; deadline?: string }
 export interface ChecklistCustomItem { id: string; title: string; completed: boolean; deadline?: string }
 export interface ChecklistStageState { items: ChecklistItemState[]; customItems: ChecklistCustomItem[] }
-export interface CalcDefItem { id: string; name: string; avg: number; customVal: string; checked: boolean; deleted: boolean }
+export interface CalcDefItem {
+  id: string; name: string; avg: number; customVal: string; checked: boolean; deleted: boolean
+  required?: boolean   // ★필수=true, ☆선택=false
+  prepStage?: string   // e.g. "D-8개월~"
+}
 export interface CalcCustomItem { id: string; name: string; price: number; checked: boolean }
 export interface CalcCategory { defItems: CalcDefItem[]; customItems: CalcCustomItem[] }
 export interface CalcState {
@@ -36,12 +40,15 @@ export interface HouseDetailBuy {
   cashGroom: string; cashBride: string; savingsGroom: string; savingsBride: string
   incomeGroom: string; incomeBride: string; birthGroom: string; birthBride: string
   loanRate: string; loanYears: string; repaymentMethod: string; married: boolean
+  existingLoan?: string       // 기존 보유 대출 잔액 (만원)
+  loanCondition?: string      // '일반' | '생애최초' | '신혼부부'
 }
 export interface HouseDetailJeonse {
   targetContract: string; region: string; price: string
   cashGroom: string; cashBride: string; savingsGroom: string; savingsBride: string
   incomeGroom: string; incomeBride: string
   loanRate: string; married: boolean
+  existingLoan?: string       // 기존 보유 대출 잔액 (만원)
 }
 export interface HouseDetailRent {
   region: string; deposit: string; monthly: string

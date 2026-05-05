@@ -3,18 +3,64 @@
   --or: #ff9a3c; --mn: #c77dff; --gr: #06d6a0; --bl: #4cc9f0;
   --bg: #fff5f7; --white: #fff; --gray1: #fef0f3; --gray2: #f5d5de; --gray3: #c9a0ac;
   --text: #3d1a24; --text2: #7a4a57;
+
+  /* 반응형 스케일 변수 */
+  --fs-xs: clamp(9px, 2.2vw, 11px);
+  --fs-sm: clamp(11px, 2.8vw, 13px);
+  --fs-base: clamp(13px, 3.2vw, 15px);
+  --fs-md: clamp(14px, 3.6vw, 16px);
+  --fs-lg: clamp(16px, 4.2vw, 20px);
+  --fs-xl: clamp(20px, 5.5vw, 28px);
+  --fs-2xl: clamp(28px, 8vw, 44px);
+
+  --r-sm: clamp(8px, 2vw, 12px);
+  --r-md: clamp(10px, 2.5vw, 14px);
+  --r-lg: clamp(12px, 3vw, 18px);
+  --r-xl: clamp(16px, 4vw, 22px);
+
+  --p-xs: clamp(6px, 1.5vw, 10px);
+  --p-sm: clamp(8px, 2vw, 14px);
+  --p-md: clamp(12px, 3vw, 20px);
+  --p-lg: clamp(14px, 3.5vw, 24px);
+
+  --gap-sm: clamp(6px, 1.5vw, 10px);
+  --gap-md: clamp(8px, 2vw, 14px);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: clamp(13px, 3.5vw, 16px); }
 body {
   background: var(--bg); color: var(--text);
   font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
-  font-size: 14px; -webkit-font-smoothing: antialiased;
+  font-size: var(--fs-base); -webkit-font-smoothing: antialiased;
   user-select: none; -webkit-user-select: none;
 }
 button { font-family: inherit; }
 input, textarea, select {
   font-family: inherit;
   user-select: text; -webkit-user-select: text;
+}
+
+/* 반응형 카드/버튼 공통 */
+.card {
+  background: #fff;
+  border-radius: var(--r-lg);
+  padding: var(--p-md);
+  box-shadow: 0 4px 20px rgba(255,107,157,.1);
+  border: 1.5px solid var(--pk4);
+}
+.btn-primary {
+  background: var(--pk); color: #fff; border: none;
+  border-radius: var(--r-sm); padding: clamp(9px,2.5vw,12px) clamp(12px,3vw,20px);
+  font-size: var(--fs-base); font-weight: 700; cursor: pointer;
+}
+
+/* 태블릿 이상 */
+@media (min-width: 600px) {
+  :root {
+    --fs-xs: 11px; --fs-sm: 13px; --fs-base: 15px;
+    --fs-md: 16px; --fs-lg: 20px; --fs-xl: 28px; --fs-2xl: 44px;
+    --p-md: 20px; --p-lg: 24px; --gap-md: 14px;
+  }
 }
 @keyframes tourPulse {
   0%, 100% { box-shadow: 0 0 0 4px rgba(255,107,157,0.5), 0 0 0 9999px rgba(0,0,0,0.55); }

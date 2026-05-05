@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
-  appId: 'com.wedding.supporter',
-  appName: '딸깍 결혼비용 계산기',
+  appId: 'com.ddalkag.wedding',
+  appName: '결혼딸깍',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

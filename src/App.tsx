@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import * as Sentry from '@sentry/react'
 import { useAuthStore, seedAdminUser } from './stores/authStore'
 import AuthPage from './pages/AuthPage'
 import Layout from './components/layout/Layout'
@@ -21,12 +22,35 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function AppFallback({ error }: { error: Error }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24, textAlign: 'center', background: '#fff5f7' }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>😵</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: '#3d1a24', marginBottom: 8 }}>앗, 오류가 발생했어요</div>
+      <div style={{ fontSize: 13, color: '#7a4a57', marginBottom: 24, lineHeight: 1.6 }}>
+        개발자에게 자동으로 오류가 전송됐습니다.<br />
+        앱을 다시 시작해주세요.
+      </div>
+      <div style={{ background: '#fef0f3', borderRadius: 10, padding: '10px 16px', fontSize: 11, color: '#c9a0ac', maxWidth: 320, wordBreak: 'break-all', marginBottom: 24 }}>
+        {error.message}
+      </div>
+      <button
+        onClick={() => window.location.replace('/')}
+        style={{ background: '#ff6b9d', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+      >
+        홈으로 돌아가기
+      </button>
+    </div>
+  )
+}
+
 export default function App() {
   const user = useAuthStore(s => s.user)
 
   useEffect(() => { seedAdminUser() }, [])
 
   return (
+    <Sentry.ErrorBoundary fallback={({ error }) => <AppFallback error={error as Error} />} showDialog={false}>
     <Routes>
       <Route path='/auth' element={(user && user.nick !== '게스트') ? <Navigate to='/' replace /> : <AuthPage />} />
       <Route path='/view/:shareToken' element={<SharedViewPage />} />
@@ -48,5 +72,6 @@ export default function App() {
           </Layout>
       } />
     </Routes>
+    </Sentry.ErrorBoundary>
   )
 }

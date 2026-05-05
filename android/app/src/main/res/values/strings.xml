@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">딸깍 결혼비용 계산기</string>
-    <string name="title_activity_main">딸깍 결혼비용 계산기</string>
-    <string name="package_name">com.wedding.supporter</string>
-    <string name="custom_url_scheme">com.wedding.supporter</string>
+    <string name="app_name">결혼딸깍</string>
+    <string name="title_activity_main">결혼딸깍</string>
+    <string name="package_name">com.ddalkag.wedding</string>
+    <string name="custom_url_scheme">com.ddalkag.wedding</string>
 </resources>

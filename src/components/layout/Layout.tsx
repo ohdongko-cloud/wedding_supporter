@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { App as CapApp } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { useAuthStore } from '../../stores/authStore'
 import { DevRequestService } from '../../services/devRequests'
 import { AnalyticsService } from '../../services/analytics'
@@ -9,6 +11,21 @@ import LeaveConfirmModal from '../LeaveConfirmModal'
 import ConflictModal from '../ConflictModal'
 import ShareModal from '../ShareModal'
 import PartnerInviteModal from '../PartnerInviteModal'
+
+function ExitConfirmPopup({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 280, textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 36, marginBottom: 10 }}>📱</div>
+        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 10, color: 'var(--text)' }}>앱을 종료하시겠습니까?</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button onClick={onClose} style={{ flex: 1, background: 'var(--gray1)', color: 'var(--text)', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>취소</button>
+          <button onClick={onConfirm} style={{ flex: 1, background: 'linear-gradient(135deg,var(--pk),var(--mn))', color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>종료</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConfirm: () => void; onClose: () => void }) {
   return (
@@ -64,10 +81,15 @@ export default function Layout({ children }: LayoutProps) {
   const [shareUrl, setShareUrl] = useState('')
   const [shareLoading, setShareLoading] = useState(false)
   const [partnerModal, setPartnerModal] = useState(false)
+  const [exitModal, setExitModal] = useState(false)
   const pendingPath = useRef<string | null>(null)
+  const locationRef = useRef<string>('/')   // 항상 최신 경로를 추적
 
   const location = useLocation()
   const navigate = useNavigate()
+
+  // location 변경 시 ref 동기화
+  useEffect(() => { locationRef.current = location.pathname }, [location.pathname])
   const user = useAuthStore(s => s.user)
   const userData = useAuthStore(s => s.userData)
   const isDirty = useAuthStore(s => s.isDirty)
@@ -81,8 +103,9 @@ export default function Layout({ children }: LayoutProps) {
 
   const isAdmin = user?.nick === 'admin'
   const isGuest = user?.nick === '게스트'
-  const title = PAGE_TITLES[location.pathname] ?? '딸깍, 결혼비용 계산기'
+  const title = PAGE_TITLES[location.pathname] ?? '결혼딸깍'
 
+  // 웹 브라우저 뒤로가기/탭닫기 경고
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (isDirty && !isGuest) { e.preventDefault(); e.returnValue = '' }
@@ -90,6 +113,37 @@ export default function Layout({ children }: LayoutProps) {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty, isGuest])
+
+  // Android 뒤로가기 버튼 처리
+  // - canGoBack(WebView 히스토리)은 SPA에서 신뢰할 수 없으므로 사용 안 함
+  // - locationRef로 현재 React Router 경로를 추적해 판단
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    let listener: any
+    const setup = async () => {
+      listener = await CapApp.addListener('backButton', () => {
+        // 사이드 메뉴 열려있으면 닫기
+        if (sideOpen) { setSideOpen(false); return }
+
+        // 변경사항 있으면 저장 다이얼로그
+        if (isDirty && !isGuest) {
+          pendingPath.current = '/'
+          setLeaveModal(true)
+          return
+        }
+
+        // 홈이면 종료 확인 팝업, 그 외 탭은 홈으로 이동
+        if (locationRef.current === '/') {
+          setExitModal(true)
+        } else {
+          navigate('/')
+        }
+      })
+    }
+    setup()
+    return () => { listener?.remove() }
+  // sideOpen도 의존성에 포함 — 메뉴 열림 상태를 핸들러가 즉시 참조
+  }, [isDirty, isGuest, sideOpen, navigate])
 
   useEffect(() => {
     if (isAdmin) setUnreadCount(DevRequestService.getUnreadCount())
@@ -175,6 +229,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {exitModal && <ExitConfirmPopup onConfirm={() => CapApp.exitApp()} onClose={() => setExitModal(false)} />}
       {deleteConfirm && <DeleteConfirmPopup nick={user?.nick ?? ''} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />}
       {devRequestOpen && <DevRequestModal onClose={() => setDevRequestOpen(false)} />}
       {leaveModal && <LeaveConfirmModal onSave={handleLeaveSave} onDiscard={handleLeaveDiscard} onCancel={handleLeaveCancel} />}
@@ -182,14 +237,14 @@ export default function Layout({ children }: LayoutProps) {
       {shareModal && <ShareModal shareUrl={shareUrl} onClose={() => setShareModal(false)} />}
       {partnerModal && user && <PartnerInviteModal nick={user.nick} onClose={() => setPartnerModal(false)} />}
 
-      <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'linear-gradient(135deg,var(--pk),var(--mn))', display: 'flex', alignItems: 'center', padding: '0 16px', height: 56, boxShadow: '0 2px 12px rgba(255,107,157,.3)' }}>
-        <button data-tour="menu-button" onClick={() => setSideOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: '6px 8px 6px 0' }}>☰</button>
-        <span style={{ flex: 1, textAlign: 'center', color: '#fff', fontSize: 16, fontWeight: 800 }}>{title}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'linear-gradient(135deg,var(--pk),var(--mn))', display: 'flex', alignItems: 'center', padding: '0 clamp(10px,3vw,16px)', height: 'clamp(48px,12vw,56px)', boxShadow: '0 2px 12px rgba(255,107,157,.3)' }}>
+        <button data-tour="menu-button" onClick={() => setSideOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 'clamp(18px,5vw,22px)', cursor: 'pointer', padding: '6px 8px 6px 0', flexShrink: 0 }}>☰</button>
+        <span style={{ flex: 1, textAlign: 'center', color: '#fff', fontSize: 'var(--fs-md)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px,1.5vw,8px)', flexShrink: 0 }}>
           {isGuest ? (
             <button
               onClick={() => navigate('/auth')}
-              style={{ background: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.5)', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ background: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.5)', color: '#fff', borderRadius: 8, padding: 'clamp(4px,1.5vw,6px) clamp(8px,2.5vw,12px)', fontSize: 'var(--fs-sm)', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               🔐 로그인
             </button>
@@ -200,7 +255,7 @@ export default function Layout({ children }: LayoutProps) {
               style={{
                 background: isDirty ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.1)',
                 border: `1px solid ${isDirty ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.25)'}`,
-                color: '#fff', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700,
+                color: '#fff', borderRadius: 8, padding: 'clamp(4px,1.5vw,5px) clamp(6px,2vw,10px)', fontSize: 'var(--fs-sm)', fontWeight: 700,
                 cursor: isDirty && !isSaving ? 'pointer' : 'default', transition: 'all .2s', whiteSpace: 'nowrap',
               }}
             >
@@ -208,7 +263,7 @@ export default function Layout({ children }: LayoutProps) {
             </button>
           )}
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'rgba(255,255,255,.85)', fontWeight: 600, maxWidth: 'clamp(50px,15vw,80px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {isGuest ? '게스트' : `${user?.nick}${isAdmin ? ' 🔑' : ''}`}
             </div>
           </div>
@@ -217,16 +272,16 @@ export default function Layout({ children }: LayoutProps) {
 
       {sideOpen && <div onClick={() => setSideOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,.35)' }} />}
 
-      <nav style={{ position: 'fixed', left: sideOpen ? 0 : -280, top: 0, bottom: 0, width: 280, zIndex: 301, background: '#fff', boxShadow: '4px 0 24px rgba(0,0,0,.12)', transition: 'left .28s cubic-bezier(.4,0,.2,1)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', padding: '24px 20px 20px', color: '#fff' }}>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{user?.nick}{isAdmin && ' 🔑'}</div>
-          <div style={{ fontSize: 12, opacity: .8, marginTop: 4 }}>딸깍, 결혼비용 계산기</div>
+      <nav style={{ position: 'fixed', left: sideOpen ? 0 : -280, top: 0, bottom: 0, width: 'min(280px, 80vw)', zIndex: 301, background: '#fff', boxShadow: '4px 0 24px rgba(0,0,0,.12)', transition: 'left .28s cubic-bezier(.4,0,.2,1)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', padding: 'clamp(18px,5vw,24px) clamp(14px,4vw,20px)', color: '#fff' }}>
+          <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 800 }}>{user?.nick}{isAdmin && ' 🔑'}</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: .8, marginTop: 4 }}>결혼딸깍</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
           {NAV_ITEMS.map(item => (
             <div key={item.path}>
-              <button onClick={() => go(item.path)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: location.pathname === item.path ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: location.pathname === item.path ? 'var(--pk)' : 'var(--text)' }}>
-                <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{item.icon}</span>{item.label}
+              <button onClick={() => go(item.path)} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,2.5vw,12px)', padding: 'clamp(11px,3vw,13px) clamp(14px,4vw,20px)', width: '100%', border: 'none', background: location.pathname === item.path ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-base)', fontWeight: 600, color: location.pathname === item.path ? 'var(--pk)' : 'var(--text)' }}>
+                <span style={{ fontSize: 'var(--fs-lg)', width: 24, textAlign: 'center' }}>{item.icon}</span>{item.label}
               </button>
               {item.dividerAfter && <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />}
             </div>
@@ -280,7 +335,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </nav>
 
-      <main style={{ maxWidth: 960, margin: '0 auto', padding: '20px 16px 60px' }}>{children}</main>
+      <main style={{ maxWidth: 960, margin: '0 auto', padding: 'clamp(12px,3.5vw,20px) clamp(10px,3vw,16px) clamp(70px,18vw,80px)' }}>{children}</main>
     </div>
   )
 }

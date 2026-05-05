@@ -199,13 +199,10 @@ export const BoardService = {
   },
 
   /* ── Views / Likes ──────────────────────────────────────────── */
-  incrementView(id: string): void {
-    // fire-and-forget
+  async incrementView(id: string): Promise<void> {
     if (supabase) {
-      void supabase.from('board_posts').select('views').eq('id', id).single()
-        .then(({ data }) => {
-          if (data) void supabase!.from('board_posts').update({ views: (data.views ?? 0) + 1 }).eq('id', id)
-        })
+      const { data } = await supabase.from('board_posts').select('views').eq('id', id).single()
+      if (data) await supabase.from('board_posts').update({ views: (data.views ?? 0) + 1 }).eq('id', id)
     } else {
       const local = loadLocal(); const p = local.posts.find(p => p.id === id)
       if (p) { p.views++; saveLocal(local) }

@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 import { useAuthStore } from '../stores/authStore'
 import { BoardService } from '../services/boardService'
 import type { Post, PostAttachment } from '../types'
 import RichEditor from '../components/RichEditor'
 
 declare global { interface Window { Kakao: any } }
+
+// Android WebView에서는 localhost가 되므로 항상 실제 도메인 사용
+const PROD_ORIGIN = 'https://weddingsupporter.vercel.app'
+const APP_ORIGIN = Capacitor.isNativePlatform() ? PROD_ORIGIN : window.location.origin
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3MB
 
@@ -103,7 +110,8 @@ export default function BoardPage() {
   }
 
   async function openDetail(post: Post) {
-    BoardService.incrementView(post.id)
+    // 조회수 먼저 await → getPost에서 올라간 수 반영
+    await BoardService.incrementView(post.id)
     const updated = await BoardService.getPost(post.id)
     setSelected(updated ?? post)
     setView('detail')
@@ -181,7 +189,7 @@ export default function BoardPage() {
   }
 
   function getShareUrl(postId: string) {
-    return `${window.location.origin}/board#post-${postId}`
+    return `${APP_ORIGIN}/board#post-${postId}`
   }
 
   async function copyLink(postId: string) {
@@ -196,13 +204,12 @@ export default function BoardPage() {
 
   function shareKakao(post: Post) {
     const url = getShareUrl(post.id)
-    const imageUrl = `${window.location.origin}/og-image.png`
+    const imageUrl = `${PROD_ORIGIN}/og-image.png`
     const plainText = post.content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 60)
-    const description = plainText || '딸깍, 결혼비용 계산기 게시판'
+    const description = plainText || '결혼딸깍 게시판'
 
     const kakao = window.Kakao
     const key = (import.meta.env.VITE_KAKAO_APP_KEY as string | undefined)
-    // lazy init: SDK가 로드됐지만 아직 초기화 안 된 경우 재시도
     if (kakao && key) {
       try { if (!kakao.isInitialized()) kakao.init(key) } catch { /* ignore */ }
     }
@@ -219,9 +226,52 @@ export default function BoardPage() {
       })
       return
     }
-    // SDK 미초기화 시: 링크 복사 후 안내
-    navigator.clipboard.writeText(url).catch(() => {})
-    showToast('링크 복사됨 📋 카카오톡에 붙여넣기 해주세요')
+    // Kakao SDK 미초기화: 네이티브 공유 시트 또는 링크 복사
+    if (Capacitor.isNativePlatform()) {
+      Share.share({ title: post.title, text: description, url, dialogTitle: '공유하기' }).catch(() => {
+        navigator.clipboard.writeText(url).catch(() => {})
+        showToast('링크 복사됨 📋 카카오톡에 붙여넣기 해주세요')
+      })
+    } else {
+      navigator.clipboard.writeText(url).catch(() => {})
+      showToast('링크 복사됨 📋 카카오톡에 붙여넣기 해주세요')
+    }
+  }
+
+  // 첨부파일 다운로드 (Android: Filesystem(Cache) → Share, 웹: <a> 태그)
+  async function downloadAttachment(att: PostAttachment) {
+    // base64 data가 없으면(Supabase에서 제거된 경우) 안내 메시지
+    if (!att.data || att.data.length < 10) {
+      showToast('이 파일은 작성 기기에서만 내려받을 수 있어요 📎')
+      return
+    }
+    if (Capacitor.isNativePlatform()) {
+      try {
+        // data URL에서 순수 base64 추출 (data:mime;base64,XXXX → XXXX)
+        const base64 = att.data.includes(',') ? att.data.split(',')[1] : att.data
+        if (!base64) { showToast('다운로드 실패 😥'); return }
+
+        // Cache 디렉터리 사용 → 별도 권한 불필요
+        await Filesystem.writeFile({
+          path: att.name,
+          data: base64,
+          directory: Directory.Cache,
+          recursive: true,
+        })
+        const { uri } = await Filesystem.getUri({ path: att.name, directory: Directory.Cache })
+        await Share.share({ title: att.name, url: uri, dialogTitle: '파일 열기' })
+      } catch (e) {
+        console.error('[downloadAttachment]', e)
+        showToast('다운로드 실패 😥')
+      }
+    } else {
+      const a = document.createElement('a')
+      a.href = att.data
+      a.download = att.name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    }
   }
 
   const filtered = posts.filter(p => {
@@ -347,13 +397,13 @@ export default function BoardPage() {
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>📎 첨부파일 ({post.attachments.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {post.attachments.map((f, i) => (
-                  <a key={i} href={f.data} download={f.name}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--pk5)', borderRadius: 8, padding: '7px 12px', border: '1px solid var(--pk4)', textDecoration: 'none', color: 'var(--text)' }}>
+                  <button key={i} onClick={() => downloadAttachment(f)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--pk5)', borderRadius: 8, padding: '7px 12px', border: '1px solid var(--pk4)', textDecoration: 'none', color: 'var(--text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                     <span style={{ fontSize: 16 }}>{getFileIcon(f.type)}</span>
                     <span style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                     <span style={{ fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>{fmtFileSize(f.size)}</span>
                     <span style={{ fontSize: 11, color: 'var(--pk)', fontWeight: 700, flexShrink: 0 }}>⬇ 다운로드</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>

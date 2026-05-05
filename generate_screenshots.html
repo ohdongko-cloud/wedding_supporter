@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>스크린샷 생성기</title>
+<style>
+  body { margin:0; background:#1a1a1a; color:#fff; font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif; padding:20px; }
+  h2 { text-align:center; margin:20px 0 10px; }
+  .row { display:flex; flex-wrap:wrap; gap:20px; justify-content:center; margin-bottom:30px; }
+  .item { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  canvas { border:1px solid #444; max-height:600px; }
+  button { padding:10px 20px; background:#ff6b9d; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; }
+  .label { font-size:12px; color:#aaa; }
+</style>
+</head>
+<body>
+
+<h2>딸깍 결혼비용 계산기 - Play Store 스크린샷</h2>
+<p style="text-align:center;color:#aaa;font-size:13px">각 이미지는 1080×1920 (9:16 세로). 모든 기기(휴대폰/7인치/10인치 태블릿)에 동일하게 사용 가능</p>
+
+<div class="row">
+  <div class="item">
+    <canvas id="c1" width="1080" height="1920"></canvas>
+    <div class="label">1. 결혼비용 계산기</div>
+    <button onclick="dl('c1','01_calculator.png')">다운로드</button>
+  </div>
+  <div class="item">
+    <canvas id="c2" width="1080" height="1920"></canvas>
+    <div class="label">2. 전체 일정관리</div>
+    <button onclick="dl('c2','02_checklist.png')">다운로드</button>
+  </div>
+  <div class="item">
+    <canvas id="c3" width="1080" height="1920"></canvas>
+    <div class="label">3. 공개 게시판</div>
+    <button onclick="dl('c3','03_board.png')">다운로드</button>
+  </div>
+</div>
+
+<script>
+const PK = '#ff6b9d', PK2 = '#ff8fab', MN = '#c77dff'
+const BG = '#fff5f7', WHITE = '#fff', TEXT = '#3d1a24', TEXT2 = '#7a4a57'
+const PK5 = '#fff0f3', GR = '#06d6a0'
+
+function header(ctx, title) {
+  // 상태바
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, 1080, 80)
+  ctx.fillStyle = '#fff'
+  ctx.font = 'bold 32px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('9:41', 540, 52)
+  ctx.textAlign = 'left'
+  ctx.font = '24px sans-serif'
+  ctx.fillText('●●● ●●', 60, 50)
+  ctx.textAlign = 'right'
+  ctx.fillText('100% ▮', 1020, 50)
+
+  // 헤더 그라데이션
+  const g = ctx.createLinearGradient(0, 80, 1080, 240)
+  g.addColorStop(0, PK)
+  g.addColorStop(1, MN)
+  ctx.fillStyle = g
+  ctx.fillRect(0, 80, 1080, 160)
+  ctx.fillStyle = '#fff'
+  ctx.font = 'bold 28px sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('☰', 60, 175)
+  ctx.font = 'bold 38px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(title, 540, 175)
+  ctx.font = '24px sans-serif'
+  ctx.textAlign = 'right'
+  ctx.fillText('💾 저장됨  딸깍♡', 1020, 175)
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+// ─────────────── 1. 결혼비용 계산기 ───────────────
+function drawCalculator() {
+  const ctx = document.getElementById('c1').getContext('2d')
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, 1080, 1920)
+  header(ctx, '결혼식 비용 계산기')
+
+  // 총 예산 카드
+  ctx.fillStyle = WHITE
+  roundRect(ctx, 40, 280, 1000, 240, 24); ctx.fill()
+  ctx.fillStyle = TEXT2; ctx.font = '28px sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText('총 예산', 80, 340)
+  ctx.fillStyle = PK; ctx.font = 'bold 64px sans-serif'
+  ctx.fillText('₩ 38,500,000', 80, 420)
+  ctx.fillStyle = TEXT2; ctx.font = '24px sans-serif'
+  ctx.fillText('현재 책정 금액', 80, 470)
+  // 진행 바
+  ctx.fillStyle = '#f5d5de'
+  roundRect(ctx, 80, 480, 920, 16, 8); ctx.fill()
+  ctx.fillStyle = PK
+  roundRect(ctx, 80, 480, 690, 16, 8); ctx.fill()
+
+  // 카테고리 리스트
+  const cats = [
+    { icon:'💒', name:'예식장', amt:'12,000,000', cnt:'식대 250명 × 48,000원' },
+    { icon:'📸', name:'스튜디오', amt:'1,800,000', cnt:'본식 + 야외 촬영' },
+    { icon:'👰', name:'드레스', amt:'2,500,000', cnt:'본식·피로연·예식' },
+    { icon:'💄', name:'메이크업', amt:'850,000', cnt:'신부·혼주·리허설' },
+    { icon:'💍', name:'예물·예단', amt:'15,000,000', cnt:'반지 / 예단 / 봉채' },
+    { icon:'🚗', name:'기타', amt:'6,350,000', cnt:'청첩장 / 부케 / 답례품' },
+  ]
+  let y = 570
+  cats.forEach(c => {
+    ctx.fillStyle = WHITE
+    roundRect(ctx, 40, y, 1000, 160, 22); ctx.fill()
+    // 아이콘 배경
+    ctx.fillStyle = PK5
+    roundRect(ctx, 70, y + 30, 100, 100, 18); ctx.fill()
+    ctx.font = '60px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(c.icon, 120, y + 80)
+    ctx.textBaseline = 'alphabetic'
+
+    ctx.fillStyle = TEXT; ctx.font = 'bold 34px sans-serif'; ctx.textAlign = 'left'
+    ctx.fillText(c.name, 200, y + 65)
+    ctx.fillStyle = TEXT2; ctx.font = '24px sans-serif'
+    ctx.fillText(c.cnt, 200, y + 105)
+
+    ctx.fillStyle = PK; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'right'
+    ctx.fillText('₩ ' + c.amt, 1000, y + 90)
+    y += 180
+  })
+
+  // 하단 워터마크
+  ctx.fillStyle = TEXT2; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'
+  ctx.fillText('💡 카테고리별 세부 항목까지 직접 입력 · 자동 합산', 540, 1880)
+}
+
+// ─────────────── 2. 전체 일정관리 ───────────────
+function drawChecklist() {
+  const ctx = document.getElementById('c2').getContext('2d')
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, 1080, 1920)
+  header(ctx, '전체 일정관리')
+
+  // 전체 진척 카드
+  ctx.fillStyle = WHITE
+  roundRect(ctx, 40, 280, 1000, 280, 24); ctx.fill()
+  ctx.fillStyle = TEXT; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText('전체 진행률', 80, 350)
+  ctx.fillStyle = PK; ctx.font = 'bold 80px sans-serif'
+  ctx.fillText('68%', 80, 460)
+  ctx.fillStyle = TEXT2; ctx.font = '26px sans-serif'
+  ctx.fillText('34 / 50 항목 완료', 80, 510)
+
+  // 원형 차트 (오른쪽)
+  ctx.beginPath()
+  ctx.arc(880, 420, 100, 0, Math.PI * 2)
+  ctx.strokeStyle = '#f5d5de'; ctx.lineWidth = 18
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(880, 420, 100, -Math.PI/2, -Math.PI/2 + Math.PI*2*0.68)
+  ctx.strokeStyle = PK; ctx.lineCap = 'round'
+  ctx.stroke()
+  ctx.fillStyle = PK; ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center'
+  ctx.fillText('💍', 880, 435)
+
+  // 단계별 카드
+  const stages = [
+    { tag:'D-180', title:'결혼 준비 시작', done:8, total:10, color:GR },
+    { tag:'D-90',  title:'스드메 · 예식장 확정', done:12, total:14, color:PK },
+    { tag:'D-30',  title:'세부 일정 조율', done:9, total:14, color:'#ff9a3c' },
+    { tag:'D-Day', title:'예식 당일', done:5, total:12, color:'#4cc9f0' },
+  ]
+  let y = 600
+  stages.forEach(s => {
+    ctx.fillStyle = WHITE
+    roundRect(ctx, 40, y, 1000, 200, 24); ctx.fill()
+    // 태그
+    ctx.fillStyle = s.color
+    roundRect(ctx, 80, y + 30, 160, 56, 28); ctx.fill()
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(s.tag, 160, y + 67)
+
+    ctx.fillStyle = TEXT; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'left'
+    ctx.fillText(s.title, 270, y + 70)
+
+    // 진행 바
+    ctx.fillStyle = '#f5d5de'
+    roundRect(ctx, 80, y + 130, 760, 16, 8); ctx.fill()
+    ctx.fillStyle = s.color
+    roundRect(ctx, 80, y + 130, 760 * (s.done / s.total), 16, 8); ctx.fill()
+    ctx.fillStyle = TEXT2; ctx.font = '26px sans-serif'; ctx.textAlign = 'right'
+    ctx.fillText(`${s.done} / ${s.total}`, 1000, y + 144)
+    y += 220
+  })
+
+  // 체크된 항목 미리보기
+  ctx.fillStyle = WHITE
+  roundRect(ctx, 40, 1500, 1000, 320, 24); ctx.fill()
+  ctx.fillStyle = TEXT; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText('✓ 최근 완료한 항목', 80, 1560)
+  const items = [
+    '✅  웨딩홀 계약 완료', '✅  스튜디오 촬영 일정 확정',
+    '✅  드레스 가봉 1차 완료', '⬜  청첩장 디자인 확정 (D-45)'
+  ]
+  items.forEach((it, i) => {
+    ctx.fillStyle = i === 3 ? TEXT2 : TEXT
+    ctx.font = '28px sans-serif'
+    ctx.fillText(it, 80, 1620 + i * 50)
+  })
+}
+
+// ─────────────── 3. 공개 게시판 ───────────────
+function drawBoard() {
+  const ctx = document.getElementById('c3').getContext('2d')
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, 1080, 1920)
+  header(ctx, '공개 게시판')
+
+  // 검색바
+  ctx.fillStyle = WHITE
+  roundRect(ctx, 40, 280, 1000, 90, 22); ctx.fill()
+  ctx.fillStyle = TEXT2; ctx.font = '28px sans-serif'; ctx.textAlign = 'left'
+  ctx.fillText('🔍  결혼 준비 꿀팁 검색하기', 80, 335)
+
+  // 카테고리 탭
+  const tabs = ['전체', '예식장', '스드메', '신혼여행', '예물']
+  let x = 40
+  tabs.forEach((t, i) => {
+    const w = ctx.measureText(t).width + 60
+    ctx.fillStyle = i === 0 ? PK : WHITE
+    roundRect(ctx, x, 400, w, 64, 32); ctx.fill()
+    ctx.fillStyle = i === 0 ? '#fff' : TEXT
+    ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(t, x + w/2, 442)
+    x += w + 16
+  })
+
+  // 게시물 리스트
+  const posts = [
+    { tag:'예식장', title:'서울 강남 웨딩홀 후기 모음', author:'예비신부♡', date:'2시간 전', likes:42, cmt:18, body:'직접 발품 팔아 다녀온 강남권 웨딩홀 5곳 후기입니다. 식대, 대관료, 분위기, 직원 응대까지 솔직하게 적어봤어요...' },
+    { tag:'스드메', title:'스드메 패키지 vs 따로 진행, 비교해봤습니다', author:'결혼7월', date:'5시간 전', likes:38, cmt:24, body:'패키지로 묶으면 평균 30% 절약된다는데, 막상 따로 진행해보니 퀄리티 차이가 컸어요. 결론은...' },
+    { tag:'신혼여행', title:'발리 5박 7일 일정 공유해요 ✈️', author:'허니문러버', date:'어제', likes:67, cmt:31, body:'성수기 발리 신혼여행 다녀왔어요. 우붓 2박 + 스미냑 3박 코스로 다녔는데 후회 없는 선택!' },
+    { tag:'예물', title:'예물 반지 다이아 4부 적당할까요?', author:'고민중', date:'어제', likes:21, cmt:15, body:'양가에서 의견이 갈려서 고민이에요. 4부 vs 5부 결혼 반지 결정 도와주세요...' },
+    { tag:'기타', title:'청첩장 모바일/실물 비율 어떻게 하셨나요?', author:'12월예신', date:'2일 전', likes:18, cmt:9, body:'요즘은 모바일 청첩장 비율이 높던데, 어른들 위해서는 실물도 필요할 것 같고...' },
+  ]
+  let y = 510
+  posts.forEach(p => {
+    ctx.fillStyle = WHITE
+    roundRect(ctx, 40, y, 1000, 240, 24); ctx.fill()
+    // 태그
+    ctx.fillStyle = PK5
+    const tw = ctx.measureText(p.tag).width + 36
+    roundRect(ctx, 70, y + 28, tw, 44, 22); ctx.fill()
+    ctx.fillStyle = PK; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(p.tag, 70 + tw/2, y + 58)
+
+    // 제목
+    ctx.fillStyle = TEXT; ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'left'
+    ctx.fillText(p.title, 70 + tw + 20, y + 60)
+
+    // 본문
+    ctx.fillStyle = TEXT2; ctx.font = '24px sans-serif'
+    const body = p.body.length > 60 ? p.body.slice(0, 60) + '...' : p.body
+    ctx.fillText(body, 70, y + 120)
+    if (p.body.length > 60) {
+      ctx.fillText(p.body.slice(60, 110), 70, y + 155)
+    }
+
+    // 메타
+    ctx.fillStyle = TEXT2; ctx.font = '22px sans-serif'
+    ctx.fillText(`${p.author}  ·  ${p.date}`, 70, y + 210)
+    ctx.textAlign = 'right'
+    ctx.fillText(`♥ ${p.likes}   💬 ${p.cmt}`, 1000, y + 210)
+
+    y += 260
+  })
+}
+
+drawCalculator()
+drawChecklist()
+drawBoard()
+
+function dl(id, name) {
+  const a = document.createElement('a')
+  a.download = name
+  a.href = document.getElementById(id).toDataURL('image/png')
+  a.click()
+}
+</script>
+</body>
+</html>

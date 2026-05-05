@@ -1,4 +1,4 @@
-package com.wedding.supporter;
+package com.ddalkag.wedding;
 
 import com.getcapacitor.BridgeActivity;
 

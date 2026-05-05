@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { useAuthStore } from '../stores/authStore'
 import type { HoneymoonPlanState, HoneymoonDay, HoneymoonScheduleItem } from '../types'
@@ -7,18 +7,17 @@ import NativeAdCard from '../components/ads/NativeAdCard'
 function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
 
+function makeEmptyItem(): HoneymoonScheduleItem {
+  return { id: uid(), time: '', reserved: false, title: '', detail: '', amount: 0, note: '' }
+}
+
 function makeDefaultPlan(): HoneymoonPlanState {
   return {
     budget: 0,
-    days: [{
-      id: uid(), dayNumber: 1, date: '', isOpen: true,
-      items: [
-        { id: uid(), time: '', reserved: false, title: '비행기', detail: '', amount: 0, note: '항공편 정보 입력' },
-        { id: uid(), time: '', reserved: false, title: '숙소', detail: '', amount: 0, note: '체크인 정보 입력' },
-        { id: uid(), time: '', reserved: false, title: '유심', detail: '', amount: 0, note: '현지 유심 또는 포켓와이파이' },
-        { id: uid(), time: '', reserved: false, title: '여행자 보험', detail: '', amount: 0, note: '보험사/증권번호 입력' },
-      ]
-    }]
+    days: [1, 2, 3].map(dayNumber => ({
+      id: uid(), dayNumber, date: '', isOpen: dayNumber === 1,
+      items: [makeEmptyItem(), makeEmptyItem(), makeEmptyItem()]
+    }))
   }
 }
 
@@ -51,11 +50,40 @@ function DeleteDayDialog({ dayNumber, onConfirm, onClose }: { dayNumber: number;
   )
 }
 
-function ScheduleRow({ item, onUpdate, onDelete }: {
+function ScheduleRow({ item, onUpdate, onDelete, isFirst }: {
   item: HoneymoonScheduleItem
   onUpdate: (field: keyof HoneymoonScheduleItem, value: string | boolean | number) => void
   onDelete: () => void
+  isFirst?: boolean
 }) {
+  // 금액은 원 단위로 입력받고, blur 시 만원으로 변환하여 저장
+  // 입력 중 props가 바뀌어도 덮어쓰지 않도록 local state + ref 사용
+  const [amountStr, setAmountStr] = useState(() => item.amount === 0 ? '' : String(item.amount * 10000))
+  const isEditingAmount = useRef(false)
+
+  useEffect(() => {
+    if (!isEditingAmount.current) {
+      setAmountStr(item.amount === 0 ? '' : String(item.amount * 10000))
+    }
+  }, [item.amount])
+
+  function handleAmountBlur() {
+    isEditingAmount.current = false
+    const won = parseInt(amountStr) || 0
+    const man = Math.round(won / 10000)
+    onUpdate('amount', man)
+    setAmountStr(man === 0 ? '' : String(man * 10000))
+  }
+
+  // 첫 번째 행에만 placeholder 예시 표시
+  const ph = {
+    time:   isFirst ? '11:00'            : '',
+    title:  isFirst ? '일정명'            : '',
+    detail: isFirst ? '장소, 예약번호 등' : '',
+    amount: isFirst ? '3000000'          : '',
+    note:   isFirst ? '메모'              : '',
+  }
+
   const inp: React.CSSProperties = {
     width: '100%', border: '1px solid var(--gray2)', borderRadius: 6,
     padding: '5px 7px', fontSize: 12, outline: 'none',
@@ -65,28 +93,29 @@ function ScheduleRow({ item, onUpdate, onDelete }: {
   return (
     <tr style={{ background: item.reserved ? '#f0fff4' : 'transparent', borderBottom: '1px solid var(--gray1)' }}>
       <td style={{ padding: '5px 5px', verticalAlign: 'middle', minWidth: 72 }}>
-        <input style={inp} value={item.time} onChange={e => onUpdate('time', e.target.value)} placeholder='09:00' />
+        <input style={inp} value={item.time} onChange={e => onUpdate('time', e.target.value)} placeholder={ph.time} />
       </td>
       <td style={{ padding: '5px 5px', textAlign: 'center', verticalAlign: 'middle', width: 40 }}>
         <input type='checkbox' checked={item.reserved} onChange={e => onUpdate('reserved', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--pk)', cursor: 'pointer' }} />
       </td>
       <td style={{ padding: '5px 5px', verticalAlign: 'middle', minWidth: 110 }}>
-        <input style={{ ...inp, textDecoration: item.reserved ? 'line-through' : 'none' }} value={item.title} onChange={e => onUpdate('title', e.target.value)} placeholder='일정명' />
+        <input style={{ ...inp, textDecoration: item.reserved ? 'line-through' : 'none' }} value={item.title} onChange={e => onUpdate('title', e.target.value)} placeholder={ph.title} />
       </td>
       <td style={{ padding: '5px 5px', verticalAlign: 'middle', minWidth: 120 }}>
-        <input style={inp} value={item.detail} onChange={e => onUpdate('detail', e.target.value)} placeholder='장소, 예약번호 등' />
+        <input style={inp} value={item.detail} onChange={e => onUpdate('detail', e.target.value)} placeholder={ph.detail} />
       </td>
-      <td style={{ padding: '5px 5px', verticalAlign: 'middle', width: 88 }}>
+      <td style={{ padding: '5px 5px', verticalAlign: 'middle', width: 110 }}>
         <input
           type='number' min={0}
           style={{ ...inp, textAlign: 'right' }}
-          value={item.amount === 0 ? '' : item.amount}
-          onChange={e => onUpdate('amount', parseInt(e.target.value) || 0)}
-          placeholder='0'
+          value={amountStr}
+          onChange={e => { isEditingAmount.current = true; setAmountStr(e.target.value) }}
+          onBlur={handleAmountBlur}
+          placeholder={ph.amount}
         />
       </td>
       <td style={{ padding: '5px 5px', verticalAlign: 'middle', minWidth: 100 }}>
-        <input style={inp} value={item.note} onChange={e => onUpdate('note', e.target.value)} placeholder='메모' />
+        <input style={inp} value={item.note} onChange={e => onUpdate('note', e.target.value)} placeholder={ph.note} />
       </td>
       <td style={{ padding: '5px 5px', textAlign: 'center', verticalAlign: 'middle', width: 30 }}>
         <button onClick={onDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 15, padding: '2px 3px', lineHeight: 1 }} title='삭제'>✕</button>
@@ -143,18 +172,19 @@ function DaySection({ day, isOnly, onToggle, onUpdateDate, onDeleteRequest, onIn
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 580 }}>
               <thead>
                 <tr style={{ background: 'var(--pk5)', borderBottom: '1.5px solid var(--pk4)' }}>
-                  {(['시간', '예약', '일정명', '세부내용', '금액(만원)', '비고', ''] as const).map(h => (
-                    <th key={h} style={{ padding: '7px 5px', fontSize: 11, fontWeight: 700, color: 'var(--pk)', textAlign: h === '금액(만원)' ? 'right' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                  {(['시간', '예약', '일정명', '세부내용', '금액(원)', '비고', ''] as const).map(h => (
+                    <th key={h} style={{ padding: '7px 5px', fontSize: 11, fontWeight: 700, color: 'var(--pk)', textAlign: h === '금액(원)' ? 'right' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {day.items.length === 0 ? (
                   <tr><td colSpan={7} style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>일정을 추가해주세요.</td></tr>
-                ) : day.items.map(item => (
+                ) : day.items.map((item, itemIdx) => (
                   <ScheduleRow
                     key={item.id}
                     item={item}
+                    isFirst={itemIdx === 0}
                     onUpdate={(f, v) => onUpdateItem(item.id, f, v)}
                     onDelete={() => onDeleteItem(item.id)}
                   />
@@ -199,7 +229,8 @@ export default function HoneymoonPlanPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dayNumber: number } | null>(null)
   const [saved, setSaved] = useState(false)
   const [guestPopup, setGuestPopup] = useState(false)
-  const [budgetStr, setBudgetStr] = useState(() => String(plan.budget || ''))
+  // budgetStr은 원(₩) 단위로 관리; 저장 시 만원으로 변환
+  const [budgetStr, setBudgetStr] = useState(() => plan.budget ? String(plan.budget * 10000) : '')
 
   function savePlan(newPlan: HoneymoonPlanState) {
     setUserData({ ...userData, honeymoonPlan: newPlan })
@@ -213,21 +244,23 @@ export default function HoneymoonPlanPage() {
   }
 
   const totalCost = plan.days.reduce((s, d) => s + d.items.reduce((ss, it) => ss + (it.amount || 0), 0), 0)
-  const budgetNum = parseInt(budgetStr) || 0
-  const diff = budgetNum - totalCost
+  // budgetWon: 입력값(원), budgetMan: 만원으로 변환
+  const budgetWon = parseInt(budgetStr) || 0
+  const budgetMan = Math.round(budgetWon / 10000)
+  const diff = budgetMan - totalCost
 
   function commitBudget() {
-    savePlan({ ...plan, budget: budgetNum })
+    savePlan({ ...plan, budget: Math.round((parseInt(budgetStr) || 0) / 10000) })
   }
 
   function exportExcel() {
-    const rows: (string | number)[][] = [['DAY', '날짜', '시간', '예약', '항목', '상세', '금액(만원)', '메모']]
+    const rows: (string | number)[][] = [['DAY', '날짜', '시간', '예약', '항목', '상세', '금액(원)', '메모']]
     plan.days.forEach(d => {
       d.items.forEach(it => {
-        rows.push([`DAY ${d.dayNumber}`, d.date, it.time, it.reserved ? '✓' : '', it.title, it.detail, it.amount || 0, it.note])
+        rows.push([`DAY ${d.dayNumber}`, d.date, it.time, it.reserved ? '✓' : '', it.title, it.detail, (it.amount || 0) * 10000, it.note])
       })
     })
-    rows.push(['', '', '', '', '', '합계', totalCost, ''])
+    rows.push(['', '', '', '', '', '합계(만원)', totalCost, ''])
     const ws = XLSX.utils.aoa_to_sheet(rows)
     ws['!cols'] = [{ wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 6 }, { wch: 18 }, { wch: 24 }, { wch: 10 }, { wch: 20 }]
     const wb = XLSX.utils.book_new()
@@ -236,7 +269,7 @@ export default function HoneymoonPlanPage() {
   }
 
   function addDay(afterIdx?: number) {
-    const newDay: HoneymoonDay = { id: uid(), dayNumber: 0, date: '', isOpen: true, items: [] }
+    const newDay: HoneymoonDay = { id: uid(), dayNumber: 0, date: '', isOpen: true, items: [makeEmptyItem(), makeEmptyItem(), makeEmptyItem()] }
     let days: HoneymoonDay[]
     if (afterIdx !== undefined) {
       days = [...plan.days.slice(0, afterIdx + 1), newDay, ...plan.days.slice(afterIdx + 1)]
@@ -261,7 +294,7 @@ export default function HoneymoonPlanPage() {
   }
 
   function addItem(dayId: string) {
-    const item: HoneymoonScheduleItem = { id: uid(), time: '', reserved: false, title: '', detail: '', amount: 0, note: '' }
+    const item = makeEmptyItem()
     savePlan({ ...plan, days: plan.days.map(d => d.id === dayId ? { ...d, items: [...d.items, item] } : d) })
   }
 
@@ -333,9 +366,9 @@ export default function HoneymoonPlanPage() {
                 onBlur={commitBudget}
                 onKeyDown={e => e.key === 'Enter' && commitBudget()}
                 placeholder='0'
-                style={{ width: 80, background: 'rgba(255,255,255,.9)', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 14, fontWeight: 700, textAlign: 'right', outline: 'none', color: '#333' }}
+                style={{ width: 120, background: 'rgba(255,255,255,.9)', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, textAlign: 'right', outline: 'none', color: '#333' }}
               />
-              <span style={{ fontSize: 11, opacity: .85 }}>만원</span>
+              <span style={{ fontSize: 11, opacity: .85 }}>원</span>
             </div>
           </div>
           <div style={{ flex: 1, background: 'rgba(255,255,255,.15)', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
@@ -344,10 +377,10 @@ export default function HoneymoonPlanPage() {
           </div>
           <div style={{
             flex: 1, borderRadius: 10, padding: '10px 8px', textAlign: 'center',
-            background: budgetNum > 0 ? (diff >= 0 ? 'rgba(72,200,120,.25)' : 'rgba(224,48,96,.25)') : 'rgba(255,255,255,.1)',
+            background: budgetWon > 0 ? (diff >= 0 ? 'rgba(72,200,120,.25)' : 'rgba(224,48,96,.25)') : 'rgba(255,255,255,.1)',
           }}>
             <div style={{ fontSize: 10, opacity: .8, marginBottom: 4 }}>차액</div>
-            {budgetNum > 0 ? (
+            {budgetWon > 0 ? (
               <div style={{ fontSize: 18, fontWeight: 800, color: diff >= 0 ? '#a8ffb0' : '#ffd0d0' }}>
                 {diff >= 0 ? '+' : ''}{fmt(diff)}<span style={{ fontSize: 10, marginLeft: 2 }}>만원</span>
               </div>

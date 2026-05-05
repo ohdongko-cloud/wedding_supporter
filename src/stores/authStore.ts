@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import * as Sentry from '@sentry/react'
 import type { AuthUser, UserData } from '../types'
 import { StorageService, userKey } from '../services/storage'
 import { CHECKLIST_STAGES } from '../data/checklistSeed'
@@ -20,9 +21,9 @@ function makeDefaultCalcState(catKeys: string[], isWedding = false): CalcState {
     mealCount: isWedding ? 200 : 0,
     mealPrice: isWedding ? 77000 : 99000,
     mealCustom: 0,
-    venueHall: isWedding ? '명동성당' : '',
-    venueRoom: isWedding ? '파밀리아홀' : '',
-    venueDirect: isWedding ? 200 : 0,
+    venueHall: '',
+    venueRoom: '',
+    venueDirect: isWedding ? 450 : 0,
     cats, totalCost: 0,
   }
 }
@@ -72,7 +73,7 @@ export function buildDefaultUserData(nick: string, pinHash: string, pinHint?: st
   })
   return {
     nick, pinHash, pinHint, weddingDate: weddingDateStr, totalBudget: 0, checklist,
-    calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'etc'], true),
+    calcWedding: makeDefaultCalcState(['wedding', 'studio', 'dress', 'makeup', 'sdm_common', 'gifts', 'etc'], true),
     calcHoneymoon: makeDefaultCalcState(['flight', 'accommodation', 'food', 'transport', 'activity', 'shopping', 'insurance', 'etc']),
     calcHouse: makeDefaultCalcState(['deposit', 'loan', 'agent', 'moving', 'appliance', 'furniture', 'interior', 'supplies', 'etc']),
     venueName: '',
@@ -184,6 +185,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     StorageService.addToRegistry(nick)
     await pushToCloud(nick, ph, userData, now)
     saveAuthLocal(nick, ph)
+    Sentry.setUser({ username: nick })
     set({ user: { nick, pinHash: ph }, userData, localUpdatedAt: now, isLoading: false })
     return { ok: true }
   },
@@ -225,17 +227,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const now = new Date().toISOString()
     pushToCloud(nick, ph, saved, now)
     saveAuthLocal(nick, ph)
+    Sentry.setUser({ username: nick })
     set({ user: { nick, pinHash: ph }, userData: saved, localUpdatedAt: now, isLoading: false })
     return { ok: true }
   },
 
   loginAnon() {
     clearAuthLocal()
+    Sentry.setUser({ username: '게스트' })
     set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
   },
 
   logout() {
     clearAuthLocal()
+    Sentry.setUser(null)
     set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
   },
 

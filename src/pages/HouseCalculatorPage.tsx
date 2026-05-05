@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import type { HouseDetail, HouseDetailBuy, HouseDetailJeonse, HouseDetailRent } from '../types'
 import BannerAd from '../components/ads/BannerAd'
@@ -194,6 +194,7 @@ const DEFAULT_BUY: HouseDetailBuy = {
   cashGroom: '', cashBride: '', savingsGroom: '', savingsBride: '',
   incomeGroom: '', incomeBride: '', birthGroom: '', birthBride: '',
   loanRate: '4.5', loanYears: '30', repaymentMethod: 'equal_principal_interest', married: false,
+  existingLoan: '', loanCondition: '일반',
 }
 
 const DEFAULT_JEONSE: HouseDetailJeonse = {
@@ -201,6 +202,7 @@ const DEFAULT_JEONSE: HouseDetailJeonse = {
   cashGroom: '', cashBride: '', savingsGroom: '', savingsBride: '',
   incomeGroom: '', incomeBride: '',
   loanRate: '3.5', married: false,
+  existingLoan: '',
 }
 
 const DEFAULT_RENT: HouseDetailRent = {
@@ -228,6 +230,24 @@ const labelStyle: React.CSSProperties = {
 const cardStyle: React.CSSProperties = {
   background: '#fff', borderRadius: 14, border: '1.5px solid var(--pk4)',
   padding: 16, marginBottom: 12,
+}
+
+// ── CollapsibleCard ───────────────────────────────────────────────────────────
+
+function CollapsibleCard({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: open ? 'var(--pk5)' : '#fff', border: 'none', cursor: 'pointer', padding: '13px 16px', borderRadius: 0 }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{title}</span>
+        <span style={{ fontSize: 16, color: 'var(--pk)', display: 'inline-block', transition: 'transform .22s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+      </button>
+      {open && <div style={{ padding: '12px 16px 16px' }}>{children}</div>}
+    </div>
+  )
 }
 
 // ── FormRow ───────────────────────────────────────────────────────────────────
@@ -290,28 +310,37 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
   const loanYears = num(data.loanYears) || 30
   const reg = data.region ? getRegulation(data.region) : null
 
+  // 대출 조건 보너스 LTV (생애최초/신혼부부 +10%p, max 80%)
+  const loanConditionBonus = (data.loanCondition === '생애최초' || data.loanCondition === '신혼부부') ? 10 : 0
+  const effectiveLtvPct = reg ? Math.min(reg.ltvPct + loanConditionBonus, 80) : 0
+
   const acquisitionTax = price > 0 ? Math.round(price * acquisitionTaxRate(price)) : 0
   const agentFee = price > 0 ? Math.round(buyAgentFee(price)) : 0
 
-  const maxLoanLtv = reg && price > 0 ? Math.round(price * reg.ltvPct / 100) : 0
+  const maxLoanLtv = effectiveLtvPct > 0 && price > 0 ? Math.round(price * effectiveLtvPct / 100) : 0
 
   const totalIncome = num(data.incomeGroom) + num(data.incomeBride)
-  // DSR: 연소득×40%÷12 = 월 상환 가능액; 월이율로 역산
+  // 기존 보유 대출의 월 상환액
+  const existingLoanAmt = num(data.existingLoan ?? '0')
+  const existingMonthly = existingLoanAmt > 0 && loanRate > 0
+    ? Math.round(monthlyPayment(existingLoanAmt * 10000, loanRate, loanYears, data.repaymentMethod) / 10000)
+    : 0
+  // DSR: 연소득×40%÷12 - 기존 월 상환액 = 신규 대출에 쓸 수 있는 월 상환액; 역산
   const monthlyRate = loanRate / 100 / 12
   const n = loanYears * 12
   let maxLoanDsr = 0
   if (totalIncome > 0 && loanRate > 0) {
-    const maxMonthly = (totalIncome * 10000) / 12 * 0.4 // 원 단위
-    // annuity 역산 → 원 단위
-    if (data.repaymentMethod === 'bullet') {
-      maxLoanDsr = Math.round(maxMonthly / monthlyRate / 10000)
-    } else if (data.repaymentMethod === 'equal_principal') {
-      // 첫 달: P/n + P*r = maxMonthly → P = maxMonthly / (1/n + r)
-      maxLoanDsr = Math.round(maxMonthly / (1 / n + monthlyRate) / 10000)
-    } else {
-      // 원리금균등
-      if (monthlyRate > 0) {
-        maxLoanDsr = Math.round((maxMonthly / (monthlyRate * Math.pow(1 + monthlyRate, n) / (Math.pow(1 + monthlyRate, n) - 1))) / 10000)
+    // 기존 대출 월 상환액을 제외한 나머지가 신규 대출에 쓸 수 있는 한도
+    const maxMonthly = Math.max(0, (totalIncome * 10000) / 12 * 0.4 - existingMonthly * 10000) // 원 단위
+    if (maxMonthly > 0) {
+      if (data.repaymentMethod === 'bullet') {
+        maxLoanDsr = Math.round(maxMonthly / monthlyRate / 10000)
+      } else if (data.repaymentMethod === 'equal_principal') {
+        maxLoanDsr = Math.round(maxMonthly / (1 / n + monthlyRate) / 10000)
+      } else {
+        if (monthlyRate > 0) {
+          maxLoanDsr = Math.round((maxMonthly / (monthlyRate * Math.pow(1 + monthlyRate, n) / (Math.pow(1 + monthlyRate, n) - 1))) / 10000)
+        }
       }
     }
   }
@@ -329,29 +358,32 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
 
   // Table rows 2억~30억 (1억 단위)
   const tableRows = useMemo(() => {
-    if (!reg) return []
+    if (!effectiveLtvPct) return []
     return Array.from({ length: 29 }, (_, i) => {
       const p = (i + 2) * 10000 // 만원
       const tax = Math.round(p * acquisitionTaxRate(p))
       const fee = Math.round(buyAgentFee(p))
-      const maxL = Math.round(p * reg.ltvPct / 100)
-      const needCash = p - maxL + tax + fee
-      return { p, tax, fee, needCash, maxL, ltv: reg.ltvPct }
+      const maxL = Math.round(p * effectiveLtvPct / 100)           // LTV 기반 최대 대출
+      const actualL = maxLoanDsr > 0 ? Math.min(maxL, maxLoanDsr) : maxL // 실질 대출
+      const needCash = p - actualL + tax + fee                     // 필요 현금 (실질 대출 반영)
+      // DSR% = 실질대출 월상환액 / 월소득
+      let dsrPct = 0
+      if (totalIncome > 0 && actualL > 0 && loanRate > 0) {
+        const mp = monthlyPayment(actualL * 10000, loanRate, loanYears, data.repaymentMethod)
+        dsrPct = Math.round((mp / ((totalIncome * 10000) / 12)) * 100)
+      }
+      return { p, tax, fee, needCash, maxL, actualL, ltv: effectiveLtvPct, dsrPct }
     })
-  }, [reg?.ltvPct])
+  }, [effectiveLtvPct, maxLoanDsr, totalIncome, loanRate, loanYears, data.repaymentMethod])
 
   return (
     <div>
       {/* Input form */}
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>입력 정보</div>
-        <FormRow label="목표 계약 시점">
-          <input type="date" value={data.targetContract} onChange={e => set('targetContract', e.target.value)} style={inputStyle} />
-        </FormRow>
+      <CollapsibleCard title="입력 정보">
         <FormRow label="지역 주소 (동 단위)">
           <input type="text" value={data.region} onChange={e => set('region', e.target.value)} placeholder="예: 서울 강남구 역삼동" style={inputStyle} />
         </FormRow>
-        <FormRow label="예상 매매가 (만원)">
+        <FormRow label="목표 매매가 (만원)">
           <input type="number" value={data.price} onChange={e => set('price', e.target.value)} placeholder="예: 80000" style={inputStyle} />
         </FormRow>
         <FormRow label="보유 현금 (만원)">
@@ -363,6 +395,22 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
             <div>
               <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
               <input type="number" value={data.cashBride} onChange={e => set('cashBride', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+          </TwoCol>
+        </FormRow>
+        <FormRow label="기존 보유 대출 잔액 (만원)">
+          <input type="number" value={data.existingLoan ?? ''} onChange={e => set('existingLoan', e.target.value)} placeholder="0 (없으면 비워두세요)" style={inputStyle} />
+          {existingLoanAmt > 0 && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>→ 예상 월 상환액: 약 {existingMonthly.toLocaleString()}만원 (DSR 차감)</div>}
+        </FormRow>
+        <FormRow label="연소득 (만원 · DSR 계산용)">
+          <TwoCol>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
+              <input type="number" value={data.incomeGroom} onChange={e => set('incomeGroom', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
+              <input type="number" value={data.incomeBride} onChange={e => set('incomeBride', e.target.value)} placeholder="0" style={inputStyle} />
             </div>
           </TwoCol>
         </FormRow>
@@ -378,19 +426,45 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
             </div>
           </TwoCol>
         </FormRow>
-        <FormRow label="연소득 (만원, DSR 계산용)">
+        <FormRow label="대출 우대 조건">
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+            {(['일반', '생애최초', '신혼부부'] as const).map(c => (
+              <button key={c} onClick={() => set('loanCondition', c)}
+                style={{ padding: '6px 14px', borderRadius: 20, border: '1.5px solid', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  borderColor: (data.loanCondition ?? '일반') === c ? 'var(--pk)' : 'var(--gray2)',
+                  background: (data.loanCondition ?? '일반') === c ? 'var(--pk)' : '#fff',
+                  color: (data.loanCondition ?? '일반') === c ? '#fff' : 'var(--text2)' }}>
+                {c}
+              </button>
+            ))}
+          </div>
+          {(data.loanCondition === '생애최초' || data.loanCondition === '신혼부부') && (
+            <div style={{ fontSize: 11, color: 'var(--pk)', background: 'var(--pk5)', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
+              우대 조건 적용 시 LTV +10%p (최대 80%) 적용됩니다.
+            </div>
+          )}
           <TwoCol>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
-              <input type="number" value={data.incomeGroom} onChange={e => set('incomeGroom', e.target.value)} placeholder="0" style={inputStyle} />
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>금리 (%)</div>
+              <input type="number" value={data.loanRate} onChange={e => set('loanRate', e.target.value)} step="0.1" style={inputStyle} />
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
-              <input type="number" value={data.incomeBride} onChange={e => set('incomeBride', e.target.value)} placeholder="0" style={inputStyle} />
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>기간 (년)</div>
+              <input type="number" value={data.loanYears} onChange={e => set('loanYears', e.target.value)} style={inputStyle} />
             </div>
           </TwoCol>
+          <div style={{ marginTop: 8 }}>
+            <select value={data.repaymentMethod} onChange={e => set('repaymentMethod', e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+              <option value="equal_principal_interest">원리금균등상환</option>
+              <option value="equal_principal">원금균등상환</option>
+              <option value="bullet">만기일시상환</option>
+            </select>
+          </div>
         </FormRow>
-        <FormRow label="생년 (4자리)">
+        <FormRow label="목표 계약 시점">
+          <input type="date" value={data.targetContract} onChange={e => set('targetContract', e.target.value)} style={inputStyle} />
+        </FormRow>
+        <FormRow label="생년 (4자리 · 참고용)">
           <TwoCol>
             <div>
               <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
@@ -402,78 +476,62 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
             </div>
           </TwoCol>
         </FormRow>
-        <FormRow label="대출 조건">
-          <TwoCol>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>금리 (%)</div>
-              <input type="number" value={data.loanRate} onChange={e => set('loanRate', e.target.value)} step="0.1" style={inputStyle} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>기간 (년)</div>
-              <input type="number" value={data.loanYears} onChange={e => set('loanYears', e.target.value)} style={inputStyle} />
-            </div>
-          </TwoCol>
-        </FormRow>
-        <FormRow label="상환 방식">
-          <select value={data.repaymentMethod} onChange={e => set('repaymentMethod', e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-            <option value="equal_principal_interest">원리금균등상환</option>
-            <option value="equal_principal">원금균등상환</option>
-            <option value="bullet">만기일시상환</option>
-          </select>
-        </FormRow>
-        <FormRow label="혼인신고">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-            <input type="checkbox" checked={data.married} onChange={e => set('married', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--pk)' }} />
-            혼인신고 완료
-          </label>
-        </FormRow>
-      </div>
+      </CollapsibleCard>
 
       {/* Summary */}
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>재무 요약</div>
+      <CollapsibleCard title="재무 요약">
         <SumRow label="총 보유 현금" value={fmtWon(totalCash)} />
         <SumRow label={`추가 저축 예상 (${months}개월)`} value={fmtWon(extraSavings)} />
         <SumRow label="확보 가능 현금 합계" value={fmtWon(availableCash)} highlight />
         <SumRow label="예상 매매가" value={price > 0 ? fmtWon(price) : '-'} />
         <SumRow label="취득세 (등록세 포함)" value={price > 0 ? fmtWon(acquisitionTax) : '-'} />
         <SumRow label="중개수수료" value={price > 0 ? fmtWon(agentFee) : '-'} />
-        <SumRow label="최대 대출 (LTV)" value={maxLoanLtv > 0 ? fmtWon(maxLoanLtv) : '-'} />
-        <SumRow label="DSR 기준 최대 대출" value={maxLoanDsr > 0 ? fmtWon(maxLoanDsr) : '-'} />
-        <SumRow label="실질 대출 가능액" value={actualLoan > 0 ? fmtWon(actualLoan) : '-'} highlight />
+        <SumRow label={`최대 대출 (LTV ${effectiveLtvPct}%)`} value={maxLoanLtv > 0 ? fmtWon(maxLoanLtv) : '-'} />
+        {existingLoanAmt > 0 && <SumRow label="기존 대출 월 상환액" value={existingMonthly > 0 ? fmtWon(existingMonthly) + '/월' : '-'} />}
+        <SumRow label="DSR 기준 신규 대출 한도" value={maxLoanDsr > 0 ? fmtWon(maxLoanDsr) : (totalIncome > 0 ? '-' : '연소득 입력 필요')} />
+        <SumRow label="실질 대출 예상액" value={actualLoan > 0 ? fmtWon(actualLoan) : '-'} highlight />
         <SumRow label="필요 현금 합계" value={requiredCash > 0 ? fmtWon(requiredCash) : '-'} />
         <SumRow
           label="현금 부족 / 여유"
-          value={requiredCash > 0 ? (cashBalance >= 0 ? `+${fmtWon(cashBalance)} 여유` : `${fmtWon(cashBalance)} 부족`) : '-'}
+          value={requiredCash > 0 ? (cashBalance >= 0 ? `+${fmtWon(cashBalance)} 여유` : `${fmtWon(Math.abs(cashBalance))} 부족`) : '-'}
           highlight
           color={requiredCash > 0 ? (cashBalance >= 0 ? '#22c55e' : '#e03060') : undefined}
         />
         <SumRow label="월 상환액 (예상)" value={loanMonthly > 0 ? fmtWon(loanMonthly) + '/월' : '-'} />
-      </div>
+      </CollapsibleCard>
 
       {/* Table */}
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10, color: 'var(--text)' }}>매매가별 분석표</div>
+      <CollapsibleCard title="매매가별 분석표">
         {reg && <RegBanner region={data.region} />}
         {!reg && (
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>지역 주소를 입력하면 규제지역 정보가 표시됩니다.</div>
         )}
         <div style={{ overflowX: 'auto', maxHeight: 360, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
             <thead style={{ position: 'sticky', top: 0, background: 'var(--pk5)', zIndex: 1 }}>
               <tr>
-                {['매매가', '취득세', '중개수수료', '필요현금', '최대대출', 'LTV'].map(h => (
-                  <th key={h} style={{ padding: '8px 4px', fontWeight: 700, color: 'var(--pk)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1.5px solid var(--pk4)' }}>{h}</th>
+                {['매매가', '필요현금', '최대대출', '실질대출', 'LTV', 'DSR', '취득세', '중개비'].map((h, hi) => (
+                  <th key={h} style={{ padding: '7px 3px', fontWeight: 700, color: hi === 1 ? '#e03060' : 'var(--pk)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1.5px solid var(--pk4)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {tableRows.map(row => {
                 const isHighlight = price > 0 && Math.abs(row.p - price) < 5001
+                const cols = [
+                  { v: fmt(row.p),     color: isHighlight ? 'var(--pk)' : undefined, bold: isHighlight },
+                  { v: fmt(row.needCash), color: '#e03060', bold: false },
+                  { v: fmt(row.maxL),  color: undefined, bold: false },
+                  { v: fmt(row.actualL), color: totalIncome > 0 ? 'var(--mn)' : undefined, bold: false },
+                  { v: `${row.ltv}%`, color: undefined, bold: false },
+                  { v: row.dsrPct > 0 ? `${row.dsrPct}%` : '-', color: row.dsrPct > 40 ? '#e03060' : undefined, bold: false },
+                  { v: fmt(row.tax),  color: undefined, bold: false },
+                  { v: fmt(row.fee),  color: undefined, bold: false },
+                ]
                 return (
                   <tr key={row.p} style={{ background: isHighlight ? 'var(--pk5)' : undefined }}>
-                    {[fmt(row.p), fmt(row.tax), fmt(row.fee), fmt(row.needCash), fmt(row.maxL), `${row.ltv}%`].map((v, j) => (
-                      <td key={j} style={{ padding: '6px 4px', textAlign: 'right', borderBottom: '1px solid var(--gray1)', fontWeight: isHighlight && j === 0 ? 800 : 400, color: isHighlight && j === 0 ? 'var(--pk)' : undefined }}>
+                    {cols.map(({ v, color, bold }, j) => (
+                      <td key={j} style={{ padding: '5px 3px', textAlign: 'right', borderBottom: '1px solid var(--gray1)', fontWeight: bold ? 800 : 400, color: color }}>
                         {v}
                       </td>
                     ))}
@@ -481,12 +539,15 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
                 )
               })}
               {tableRows.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 16, color: 'var(--text2)', fontSize: 12 }}>지역을 입력하면 분석표가 표시됩니다.</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 16, color: 'var(--text2)', fontSize: 12 }}>지역을 입력하면 분석표가 표시됩니다.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+        {totalIncome === 0 && tableRows.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>💡 연소득을 입력하면 실질대출·DSR 열이 계산됩니다.</div>
+        )}
+      </CollapsibleCard>
     </div>
   )
 }
@@ -531,17 +592,15 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
     })
   }, [])
 
+  const existingLoanAmt = num(data.existingLoan ?? '0')
+
   return (
     <div>
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>입력 정보</div>
-        <FormRow label="목표 계약 시점">
-          <input type="date" value={data.targetContract} onChange={e => set('targetContract', e.target.value)} style={inputStyle} />
-        </FormRow>
+      <CollapsibleCard title="입력 정보">
         <FormRow label="지역 주소">
           <input type="text" value={data.region} onChange={e => set('region', e.target.value)} placeholder="예: 서울 마포구 합정동" style={inputStyle} />
         </FormRow>
-        <FormRow label="예상 전세가 (만원)">
+        <FormRow label="목표 전세가 (만원)">
           <input type="number" value={data.price} onChange={e => set('price', e.target.value)} placeholder="예: 40000" style={inputStyle} />
         </FormRow>
         <FormRow label="보유 현금 (만원)">
@@ -553,6 +612,21 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
             <div>
               <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
               <input type="number" value={data.cashBride} onChange={e => set('cashBride', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+          </TwoCol>
+        </FormRow>
+        <FormRow label="기존 보유 대출 잔액 (만원)">
+          <input type="number" value={data.existingLoan ?? ''} onChange={e => set('existingLoan', e.target.value)} placeholder="0 (없으면 비워두세요)" style={inputStyle} />
+        </FormRow>
+        <FormRow label="연소득 (만원)">
+          <TwoCol>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
+              <input type="number" value={data.incomeGroom} onChange={e => set('incomeGroom', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
+              <input type="number" value={data.incomeBride} onChange={e => set('incomeBride', e.target.value)} placeholder="0" style={inputStyle} />
             </div>
           </TwoCol>
         </FormRow>
@@ -568,31 +642,24 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
             </div>
           </TwoCol>
         </FormRow>
-        <FormRow label="연소득 (만원)">
-          <TwoCol>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
-              <input type="number" value={data.incomeGroom} onChange={e => set('incomeGroom', e.target.value)} placeholder="0" style={inputStyle} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
-              <input type="number" value={data.incomeBride} onChange={e => set('incomeBride', e.target.value)} placeholder="0" style={inputStyle} />
-            </div>
-          </TwoCol>
+        <FormRow label="대출 조건">
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+              <input type="checkbox" checked={data.married} onChange={e => set('married', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--pk)' }} />
+              신혼부부 특례 적용 (80%, 최대 3억)
+            </label>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>전세대출 금리 (%)</div>
+            <input type="number" value={data.loanRate} onChange={e => set('loanRate', e.target.value)} step="0.1" style={inputStyle} />
+          </div>
         </FormRow>
-        <FormRow label="전세대출 금리 (%)">
-          <input type="number" value={data.loanRate} onChange={e => set('loanRate', e.target.value)} step="0.1" style={inputStyle} />
+        <FormRow label="목표 계약 시점">
+          <input type="date" value={data.targetContract} onChange={e => set('targetContract', e.target.value)} style={inputStyle} />
         </FormRow>
-        <FormRow label="혼인신고">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-            <input type="checkbox" checked={data.married} onChange={e => set('married', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--pk)' }} />
-            혼인신고 완료 (신혼부부 특례 적용)
-          </label>
-        </FormRow>
-      </div>
+      </CollapsibleCard>
 
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>재무 요약</div>
+      <CollapsibleCard title="재무 요약">
         <SumRow label="총 보유 현금" value={fmtWon(totalCash)} />
         <SumRow label={`추가 저축 예상 (${months}개월)`} value={fmtWon(extraSavings)} />
         <SumRow label="확보 가능 현금 합계" value={fmtWon(availableCash)} highlight />
@@ -600,6 +667,7 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
         <SumRow label="전세 중개수수료" value={price > 0 ? fmtWon(agentFee) : '-'} />
         <SumRow label="전세자금대출 한도 (일반 80%)" value={loanLimit80 > 0 ? fmtWon(loanLimit80) : '-'} />
         {data.married && <SumRow label="신혼부부 특례 한도 (80%, 최대 3억)" value={loanLimitNewlywed > 0 ? fmtWon(loanLimitNewlywed) : '-'} />}
+        {existingLoanAmt > 0 && <SumRow label="기존 대출 잔액" value={fmtWon(existingLoanAmt)} />}
         <SumRow label="적용 대출 한도" value={actualLoan > 0 ? fmtWon(actualLoan) : '-'} highlight />
         <SumRow label="필요 현금 (전세가-대출+수수료)" value={requiredCash > 0 ? fmtWon(requiredCash) : '-'} />
         <SumRow
@@ -609,10 +677,9 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
           color={requiredCash > 0 ? (cashBalance >= 0 ? '#22c55e' : '#e03060') : undefined}
         />
         <SumRow label="월 이자 (이자만 납부 기준)" value={monthlyInterest > 0 ? fmtWon(monthlyInterest) + '/월' : '-'} />
-      </div>
+      </CollapsibleCard>
 
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10, color: 'var(--text)' }}>전세가별 분석표</div>
+      <CollapsibleCard title="전세가별 분석표">
         {data.region && <RegBanner region={data.region} />}
         <div style={{ overflowX: 'auto', maxHeight: 360, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
@@ -639,7 +706,7 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
             </tbody>
           </table>
         </div>
-      </div>
+      </CollapsibleCard>
     </div>
   )
 }
@@ -666,8 +733,7 @@ function RentTab({ data, onChange }: { data: HouseDetailRent; onChange: (d: Hous
 
   return (
     <div>
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>입력 정보</div>
+      <CollapsibleCard title="입력 정보">
         <FormRow label="지역 주소">
           <input type="text" value={data.region} onChange={e => set('region', e.target.value)} placeholder="예: 서울 은평구 응암동" style={inputStyle} />
         </FormRow>
@@ -689,18 +755,6 @@ function RentTab({ data, onChange }: { data: HouseDetailRent; onChange: (d: Hous
             </div>
           </TwoCol>
         </FormRow>
-        <FormRow label="월 저축액 (만원)">
-          <TwoCol>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
-              <input type="number" value={data.savingsGroom} onChange={e => set('savingsGroom', e.target.value)} placeholder="0" style={inputStyle} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
-              <input type="number" value={data.savingsBride} onChange={e => set('savingsBride', e.target.value)} placeholder="0" style={inputStyle} />
-            </div>
-          </TwoCol>
-        </FormRow>
         <FormRow label="연소득 (만원)">
           <TwoCol>
             <div>
@@ -713,10 +767,21 @@ function RentTab({ data, onChange }: { data: HouseDetailRent; onChange: (d: Hous
             </div>
           </TwoCol>
         </FormRow>
-      </div>
+        <FormRow label="월 저축액 (만원)">
+          <TwoCol>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
+              <input type="number" value={data.savingsGroom} onChange={e => set('savingsGroom', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
+              <input type="number" value={data.savingsBride} onChange={e => set('savingsBride', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+          </TwoCol>
+        </FormRow>
+      </CollapsibleCard>
 
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>재무 분석</div>
+      <CollapsibleCard title="재무 분석">
         <SumRow label="총 보유 현금" value={fmtWon(totalCash)} />
         <SumRow label="보증금" value={deposit > 0 ? fmtWon(deposit) : '-'} />
         <SumRow
@@ -734,15 +799,15 @@ function RentTab({ data, onChange }: { data: HouseDetailRent; onChange: (d: Hous
         />
         <SumRow label="전세 전환 시 예상 전세가" value={jeonseEquiv > 0 ? fmtWon(jeonseEquiv) : '-'} />
         <SumRow label="매매 전환 참고가 (전세×1.2)" value={buyEquiv > 0 ? fmtWon(buyEquiv) : '-'} />
-      </div>
+      </CollapsibleCard>
 
-      <div style={{ ...cardStyle, background: 'var(--pk5)' }}>
+      <CollapsibleCard title="참고 안내" defaultOpen={false}>
         <div style={{ fontSize: 12, color: 'var(--text2)' }}>
           <strong style={{ color: 'var(--pk)' }}>전세 전환율 안내</strong><br />
           전세 전환가 = 월세 × 100 + 보증금 (전환율 12% 기준 근사치)<br />
           매매 참고가는 실제 시세와 다를 수 있으니 현지 임장을 통해 확인하세요.
         </div>
-      </div>
+      </CollapsibleCard>
     </div>
   )
 }
@@ -790,12 +855,6 @@ export default function HouseCalculatorPage() {
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px 32px' }}>
-      {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 16 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>신혼집 비용 계산기</div>
-        <div style={{ fontSize: 12, opacity: 0.85 }}>매매 · 전세 · 월세 시뮬레이션으로 현명한 집 마련 계획을 세워보세요.</div>
-      </div>
-
       {/* Budget goal — buy / jeonse only */}
       {mode !== 'rent' && (
         <div style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 14, padding: '16px 20px', color: '#fff', marginBottom: 16 }}>
@@ -846,8 +905,7 @@ export default function HouseCalculatorPage() {
       </div>
 
       {/* Common header section */}
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>기본 정보</div>
+      <CollapsibleCard title="기본 정보">
         <FormRow label="입주 목표 시점">
           <input
             type="date"
@@ -860,18 +918,28 @@ export default function HouseCalculatorPage() {
           <input
             type="text"
             value={houseDetail.address}
-            onChange={e => update({ ...houseDetail, address: e.target.value })}
+            onChange={e => {
+              const addr = e.target.value
+              // 기본정보 주소 → 각 탭의 지역주소 자동 동기화
+              update({
+                ...houseDetail,
+                address: addr,
+                buy: { ...houseDetail.buy, region: addr },
+                jeonse: { ...houseDetail.jeonse, region: addr },
+                rent: { ...houseDetail.rent, region: addr },
+              })
+            }}
             placeholder="예: 래미안 퍼스티지 (반포동)"
             style={inputStyle}
           />
         </FormRow>
-      </div>
+        <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: -4 }}>입력 시 매매·전세·월세 탭의 지역주소가 자동으로 동기화됩니다.</div>
+      </CollapsibleCard>
 
       {/* Timeline */}
-      <div style={cardStyle}>
-        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10, color: 'var(--text)' }}>준비 타임라인</div>
+      <CollapsibleCard title="준비 타임라인" defaultOpen={false}>
         <Timeline moveInDate={houseDetail.targetMoveIn} steps={timelineSteps} />
-      </div>
+      </CollapsibleCard>
 
       {/* Tab content */}
       {mode === 'buy' && (

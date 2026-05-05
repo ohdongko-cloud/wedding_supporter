@@ -125,58 +125,58 @@ export default function DashboardPage() {
       {showOnboarding && <OnboardingWizard nick={userData.nick} onComplete={completeOnboarding} />}
 
       {/* Wedding date + D-DAY */}
-      <div data-tour="wedding-date" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>
+      <div data-tour="wedding-date" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 'var(--r-lg)', padding: 'var(--p-md)', color: '#fff', marginBottom: 'var(--gap-md)', boxShadow: '0 6px 24px rgba(255,107,157,.3)' }}>
         {dday !== null ? (
-          <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', marginBottom: 16 }}>
-            <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,.15)', borderRadius: 12, padding: '14px 8px' }}>
-              <div style={{ fontSize: 11, opacity: .8, marginBottom: 4 }}>결혼식까지</div>
-              <div style={{ fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
+          <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'stretch', marginBottom: 'clamp(10px,3vw,16px)' }}>
+            <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,.15)', borderRadius: 'var(--r-md)', padding: 'clamp(10px,2.5vw,14px) 8px' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', opacity: .8, marginBottom: 4 }}>결혼식까지</div>
+              <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: 900, lineHeight: 1 }}>
                 {dday > 0 ? `D-${dday}` : dday === 0 ? 'D-DAY' : `D+${Math.abs(dday)}`}
               </div>
-              <div style={{ fontSize: 12, opacity: .75, marginTop: 6 }}>{weddingDate}</div>
+              <div style={{ fontSize: 'var(--fs-xs)', opacity: .75, marginTop: 6 }}>{weddingDate}</div>
             </div>
-            <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,.15)', borderRadius: 12, padding: '14px 8px' }}>
-              <div style={{ fontSize: 11, opacity: .8, marginBottom: 4 }}>결혼 준비 진척률</div>
-              <div style={{ fontSize: 44, fontWeight: 900, lineHeight: 1 }}>{pct}%</div>
-              <div style={{ fontSize: 12, opacity: .75, marginTop: 6 }}>{done}/{total}개 완료</div>
+            <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,.15)', borderRadius: 'var(--r-md)', padding: 'clamp(10px,2.5vw,14px) 8px' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', opacity: .8, marginBottom: 4 }}>결혼 준비 진척률</div>
+              <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: 900, lineHeight: 1 }}>{pct}%</div>
+              <div style={{ fontSize: 'var(--fs-xs)', opacity: .75, marginTop: 6 }}>{done}/{total}개 완료</div>
             </div>
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '8px 0 16px', opacity: .85 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>결혼 예정일을 입력해주세요 💍</div>
+            <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>결혼 예정일을 입력해주세요 💍</div>
           </div>
         )}
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, opacity: .85, fontWeight: 600 }}>결혼 예정일</span>
+            <span style={{ fontSize: 'var(--fs-sm)', opacity: .85, fontWeight: 600 }}>결혼 예정일</span>
             <button
               onClick={() => setDateMode(m => m === 'calendar' ? 'manual' : 'calendar')}
-              style={{ background: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.4)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}
+              style={{ background: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.4)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: 'var(--fs-xs)', cursor: 'pointer' }}
             >
               {dateMode === 'calendar' ? '숫자 입력' : '달력 선택'}
             </button>
           </div>
           {dateMode === 'calendar' ? (
-            <input type='date' value={weddingDate} onChange={e => setWeddingDate(e.target.value)} style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }} />
+            <input type='date' value={weddingDate} onChange={e => setWeddingDate(e.target.value)} style={{ width: '100%', border: 'none', borderRadius: 10, padding: 'clamp(8px,2.5vw,10px) 12px', fontSize: 'var(--fs-base)', boxSizing: 'border-box', outline: 'none', color: '#333' }} />
           ) : (
-            <input type='text' value={weddingDate} onChange={e => setWeddingDate(e.target.value)} placeholder='YYYY-MM-DD (예: 2026-10-10)' style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }} />
+            <input type='text' value={weddingDate} onChange={e => setWeddingDate(e.target.value)} placeholder='YYYY-MM-DD (예: 2026-10-10)' style={{ width: '100%', border: 'none', borderRadius: 10, padding: 'clamp(8px,2.5vw,10px) 12px', fontSize: 'var(--fs-base)', boxSizing: 'border-box', outline: 'none', color: '#333' }} />
           )}
         </div>
-        <button onClick={save} style={{ width: '100%', background: saved ? 'rgba(255,255,255,.9)' : '#fff', color: saved ? 'var(--gr)' : 'var(--pk)', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 14, fontWeight: 800, cursor: 'pointer', transition: 'all .2s' }}>
+        <button onClick={save} style={{ width: '100%', background: saved ? 'rgba(255,255,255,.9)' : '#fff', color: saved ? 'var(--gr)' : 'var(--pk)', border: 'none', borderRadius: 10, padding: 'clamp(9px,2.5vw,11px) 0', fontSize: 'var(--fs-base)', fontWeight: 800, cursor: 'pointer', transition: 'all .2s' }}>
           {saved ? '저장되었습니다 ✓' : '저장하기'}
         </button>
       </div>
 
       {/* Checklist progress section */}
-      <div data-tour="progress" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '16px 16px 14px', marginBottom: 14, boxShadow: '0 6px 24px rgba(255,107,157,.2)' }}>
+      <div data-tour="progress" style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 'var(--r-lg)', padding: 'var(--p-sm) var(--p-md)', marginBottom: 'var(--gap-md)', boxShadow: '0 6px 24px rgba(255,107,157,.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{pct}%</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)', marginTop: 3 }}>{done}개 완료 · 전체 {total}개</div>
+            <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{pct}%</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'rgba(255,255,255,.8)', marginTop: 3 }}>{done}개 완료 · 전체 {total}개</div>
           </div>
-          <div style={{ textAlign: 'right', color: 'rgba(255,255,255,.85)', fontSize: 12 }}>
-            <div style={{ fontSize: 11, marginBottom: 2 }}>남은 항목</div>
-            <div style={{ fontSize: 24, fontWeight: 800 }}>{total - done}개</div>
+          <div style={{ textAlign: 'right', color: 'rgba(255,255,255,.85)', fontSize: 'var(--fs-xs)' }}>
+            <div style={{ marginBottom: 2 }}>남은 항목</div>
+            <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 800 }}>{total - done}개</div>
           </div>
         </div>
         <div style={{ height: 8, background: 'rgba(255,255,255,.25)', borderRadius: 4, marginBottom: 4 }}>
@@ -192,38 +192,38 @@ export default function DashboardPage() {
       <WeeklyTasks deadlineItems={deadlineItems} onToggle={toggleItem} />
 
       {/* Budget summary */}
-      <div data-tour="budget" style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 14, padding: '18px 20px', color: '#fff', marginBottom: 14, boxShadow: '0 6px 24px rgba(102,126,234,.25)' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, opacity: .85, marginBottom: 12 }}>예산 현황</div>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+      <div data-tour="budget" style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 'var(--r-lg)', padding: 'var(--p-md)', color: '#fff', marginBottom: 'var(--gap-md)', boxShadow: '0 6px 24px rgba(102,126,234,.25)' }}>
+        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, opacity: .85, marginBottom: 'clamp(8px,2.5vw,12px)' }}>예산 현황</div>
+        <div style={{ display: 'flex', gap: 'var(--gap-sm)', marginBottom: 'clamp(10px,3vw,14px)' }}>
           {[
             { label: '총 예산', val: budget > 0 ? `${fmt(budget)}만원` : '미설정', sub: '' },
-            { label: '예상 비용', val: `${fmt(expected)}만원`, sub: '결혼식+신혼여행+신혼집' },
+            { label: '예상 비용', val: `${fmt(expected)}만원`, sub: '결혼식+여행+신혼집' },
             { label: '차액', val: budget > 0 ? `${diff >= 0 ? '+' : ''}${fmt(diff)}만원` : '-', sub: '', warn: budget > 0 && diff < 0 },
           ].map(({ label, val, sub, warn }) => (
-            <div key={label} style={{ flex: 1, background: 'rgba(255,255,255,.15)', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, opacity: .8, marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: warn ? '#ffd0d0' : '#fff' }}>{val}</div>
-              {sub && <div style={{ fontSize: 9, opacity: .7, marginTop: 3 }}>{sub}</div>}
+            <div key={label} style={{ flex: 1, background: 'rgba(255,255,255,.15)', borderRadius: 'var(--r-sm)', padding: 'clamp(8px,2.5vw,10px) clamp(4px,1.5vw,8px)', textAlign: 'center', minWidth: 0 }}>
+              <div style={{ fontSize: 'var(--fs-xs)', opacity: .8, marginBottom: 3 }}>{label}</div>
+              <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 800, color: warn ? '#ffd0d0' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</div>
+              {sub && <div style={{ fontSize: 'var(--fs-xs)', opacity: .7, marginTop: 2 }}>{sub}</div>}
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 11, opacity: .7, textAlign: 'center', marginTop: 4 }}>
+        <div style={{ fontSize: 'var(--fs-xs)', opacity: .7, textAlign: 'center', marginTop: 4 }}>
           각 계산기에서 목표 예산을 설정하면 여기에 합산됩니다
         </div>
       </div>
 
       {/* Quick navigation */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap-sm)', marginBottom: 'var(--gap-md)' }}>
         {[
           { path: '/checklist', icon: '✅', label: '전체 일정관리', sub: `${pct}% 완료`, tour: 'nav-checklist' },
-          { path: '/calc/wedding', icon: '💒', label: '결혼식 비용 계산기', sub: `${fmt(calcTotal(userData.calcWedding, true))}만원`, tour: 'nav-wedding' },
+          { path: '/calc/wedding', icon: '💒', label: '결혼식 비용', sub: `${fmt(calcTotal(userData.calcWedding, true))}만원`, tour: 'nav-wedding' },
           { path: '/honeymoon', icon: '✈️', label: '신혼여행 계획', sub: `${fmt(honeymoonTotal)}만원`, tour: undefined },
-          { path: '/calc/house', icon: '🏡', label: '신혼집 마련 계획', sub: `${fmt(calcTotal(userData.calcHouse))}만원`, tour: undefined },
+          { path: '/calc/house', icon: '🏡', label: '신혼집 마련', sub: `${fmt(calcTotal(userData.calcHouse))}만원`, tour: undefined },
         ].map(q => (
-          <button key={q.path} data-tour={q.tour} onClick={() => navigate(q.path)} style={{ background: '#fff', border: '1.5px solid var(--pk4)', borderRadius: 14, padding: '14px 12px', textAlign: 'center', cursor: 'pointer', color: 'var(--text)' }}>
-            <span style={{ fontSize: 24, display: 'block', marginBottom: 4 }}>{q.icon}</span>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>{q.label}</div>
-            <div style={{ fontSize: 11, color: 'var(--pk)', marginTop: 3 }}>{q.sub}</div>
+          <button key={q.path} data-tour={q.tour} onClick={() => navigate(q.path)} style={{ background: '#fff', border: '1.5px solid var(--pk4)', borderRadius: 'var(--r-lg)', padding: 'clamp(10px,3vw,14px) clamp(8px,2.5vw,12px)', textAlign: 'center', cursor: 'pointer', color: 'var(--text)' }}>
+            <span style={{ fontSize: 'clamp(20px,5.5vw,26px)', display: 'block', marginBottom: 4 }}>{q.icon}</span>
+            <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>{q.label}</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--pk)', marginTop: 3 }}>{q.sub}</div>
           </button>
         ))}
       </div>

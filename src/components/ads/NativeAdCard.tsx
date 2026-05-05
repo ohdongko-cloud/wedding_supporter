@@ -6,7 +6,11 @@
  * 현재는 웹/네이티브 공통으로 동일한 카드 UI를 렌더링합니다.
  * 추후 실제 AdMob Native Advanced 광고로 교체 시 이 컴포넌트를 수정하세요.
  */
+import { Capacitor } from '@capacitor/core'
+
 export default function NativeAdCard() {
+  // 웹에서는 미노출
+  if (!Capacitor.isNativePlatform()) return null
   return (
     <div style={{
       background: '#fff',
