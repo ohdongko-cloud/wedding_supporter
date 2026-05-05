@@ -40,7 +40,8 @@ export interface HouseDetailBuy {
   cashGroom: string; cashBride: string; savingsGroom: string; savingsBride: string
   incomeGroom: string; incomeBride: string; birthGroom: string; birthBride: string
   loanRate: string; loanYears: string; repaymentMethod: string; married: boolean
-  existingLoan?: string       // 기존 보유 대출 잔액 (만원)
+  existingLoanGroom?: string  // 기존 보유 대출 잔액 - 신랑 (만원)
+  existingLoanBride?: string  // 기존 보유 대출 잔액 - 신부 (만원)
   loanCondition?: string      // '일반' | '생애최초' | '신혼부부'
 }
 export interface HouseDetailJeonse {
@@ -48,7 +49,8 @@ export interface HouseDetailJeonse {
   cashGroom: string; cashBride: string; savingsGroom: string; savingsBride: string
   incomeGroom: string; incomeBride: string
   loanRate: string; married: boolean
-  existingLoan?: string       // 기존 보유 대출 잔액 (만원)
+  existingLoanGroom?: string  // 기존 보유 대출 잔액 - 신랑 (만원)
+  existingLoanBride?: string  // 기존 보유 대출 잔액 - 신부 (만원)
 }
 export interface HouseDetailRent {
   region: string; deposit: string; monthly: string

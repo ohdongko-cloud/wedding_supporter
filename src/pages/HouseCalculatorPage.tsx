@@ -194,7 +194,7 @@ const DEFAULT_BUY: HouseDetailBuy = {
   cashGroom: '', cashBride: '', savingsGroom: '', savingsBride: '',
   incomeGroom: '', incomeBride: '', birthGroom: '', birthBride: '',
   loanRate: '4.5', loanYears: '30', repaymentMethod: 'equal_principal_interest', married: false,
-  existingLoan: '', loanCondition: '일반',
+  existingLoanGroom: '', existingLoanBride: '', loanCondition: '일반',
 }
 
 const DEFAULT_JEONSE: HouseDetailJeonse = {
@@ -202,7 +202,7 @@ const DEFAULT_JEONSE: HouseDetailJeonse = {
   cashGroom: '', cashBride: '', savingsGroom: '', savingsBride: '',
   incomeGroom: '', incomeBride: '',
   loanRate: '3.5', married: false,
-  existingLoan: '',
+  existingLoanGroom: '', existingLoanBride: '',
 }
 
 const DEFAULT_RENT: HouseDetailRent = {
@@ -320,8 +320,8 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
   const maxLoanLtv = effectiveLtvPct > 0 && price > 0 ? Math.round(price * effectiveLtvPct / 100) : 0
 
   const totalIncome = num(data.incomeGroom) + num(data.incomeBride)
-  // 기존 보유 대출의 월 상환액
-  const existingLoanAmt = num(data.existingLoan ?? '0')
+  // 기존 보유 대출의 월 상환액 (신랑 + 신부 합산)
+  const existingLoanAmt = num(data.existingLoanGroom ?? '0') + num(data.existingLoanBride ?? '0')
   const existingMonthly = existingLoanAmt > 0 && loanRate > 0
     ? Math.round(monthlyPayment(existingLoanAmt * 10000, loanRate, loanYears, data.repaymentMethod) / 10000)
     : 0
@@ -399,8 +399,17 @@ function BuyTab({ data, onChange }: { data: HouseDetailBuy; onChange: (d: HouseD
           </TwoCol>
         </FormRow>
         <FormRow label="기존 보유 대출 잔액 (만원)">
-          <input type="number" value={data.existingLoan ?? ''} onChange={e => set('existingLoan', e.target.value)} placeholder="0 (없으면 비워두세요)" style={inputStyle} />
-          {existingLoanAmt > 0 && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>→ 예상 월 상환액: 약 {existingMonthly.toLocaleString()}만원 (DSR 차감)</div>}
+          <TwoCol>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
+              <input type="number" value={data.existingLoanGroom ?? ''} onChange={e => set('existingLoanGroom', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
+              <input type="number" value={data.existingLoanBride ?? ''} onChange={e => set('existingLoanBride', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+          </TwoCol>
+          {existingLoanAmt > 0 && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>→ 합계 {fmt(existingLoanAmt)}원 · 예상 월 상환액: 약 {existingMonthly.toLocaleString()}만원 (DSR 차감)</div>}
         </FormRow>
         <FormRow label="연소득 (만원 · DSR 계산용)">
           <TwoCol>
@@ -592,7 +601,7 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
     })
   }, [])
 
-  const existingLoanAmt = num(data.existingLoan ?? '0')
+  const existingLoanAmt = num(data.existingLoanGroom ?? '0') + num(data.existingLoanBride ?? '0')
 
   return (
     <div>
@@ -616,7 +625,16 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
           </TwoCol>
         </FormRow>
         <FormRow label="기존 보유 대출 잔액 (만원)">
-          <input type="number" value={data.existingLoan ?? ''} onChange={e => set('existingLoan', e.target.value)} placeholder="0 (없으면 비워두세요)" style={inputStyle} />
+          <TwoCol>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신랑</div>
+              <input type="number" value={data.existingLoanGroom ?? ''} onChange={e => set('existingLoanGroom', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>신부</div>
+              <input type="number" value={data.existingLoanBride ?? ''} onChange={e => set('existingLoanBride', e.target.value)} placeholder="0" style={inputStyle} />
+            </div>
+          </TwoCol>
         </FormRow>
         <FormRow label="연소득 (만원)">
           <TwoCol>
@@ -685,18 +703,25 @@ function JeonseTab({ data, onChange }: { data: HouseDetailJeonse; onChange: (d: 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead style={{ position: 'sticky', top: 0, background: 'var(--pk5)', zIndex: 1 }}>
               <tr>
-                {['전세가', '중개수수료', '전세대출(80%)', '필요현금', '비고'].map(h => (
-                  <th key={h} style={{ padding: '8px 4px', fontWeight: 700, color: 'var(--pk)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1.5px solid var(--pk4)' }}>{h}</th>
+                {['전세가', '필요현금', '전세대출(80%)', '중개수수료', '비고'].map((h, hi) => (
+                  <th key={h} style={{ padding: '8px 4px', fontWeight: 700, color: hi === 1 ? '#e03060' : 'var(--pk)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1.5px solid var(--pk4)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {tableRows.map(row => {
                 const isHighlight = price > 0 && Math.abs(row.p - price) < 2501
+                const cols = [
+                  { v: fmt(row.p),       color: isHighlight ? 'var(--pk)' : undefined, bold: isHighlight },
+                  { v: fmt(row.needCash), color: '#e03060',  bold: false },
+                  { v: fmt(row.limit),   color: undefined,   bold: false },
+                  { v: fmt(row.fee),     color: undefined,   bold: false },
+                  { v: row.note,         color: '#f59e0b',   bold: false },
+                ]
                 return (
                   <tr key={row.p} style={{ background: isHighlight ? 'var(--pk5)' : undefined }}>
-                    {[fmt(row.p), fmt(row.fee), fmt(row.limit), fmt(row.needCash), row.note].map((v, j) => (
-                      <td key={j} style={{ padding: '6px 4px', textAlign: 'right', borderBottom: '1px solid var(--gray1)', fontWeight: isHighlight && j === 0 ? 800 : 400, color: isHighlight && j === 0 ? 'var(--pk)' : j === 4 ? '#f59e0b' : undefined }}>
+                    {cols.map(({ v, color, bold }, j) => (
+                      <td key={j} style={{ padding: '6px 4px', textAlign: 'right', borderBottom: '1px solid var(--gray1)', fontWeight: bold ? 800 : 400, color }}>
                         {v}
                       </td>
                     ))}
@@ -799,6 +824,42 @@ function RentTab({ data, onChange }: { data: HouseDetailRent; onChange: (d: Hous
         />
         <SumRow label="전세 전환 시 예상 전세가" value={jeonseEquiv > 0 ? fmtWon(jeonseEquiv) : '-'} />
         <SumRow label="매매 전환 참고가 (전세×1.2)" value={buyEquiv > 0 ? fmtWon(buyEquiv) : '-'} />
+      </CollapsibleCard>
+
+      {/* 월세 구간별 분석표 */}
+      <CollapsibleCard title="월세 구간별 분석표">
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
+          현재 입력한 보증금 기준 · 월세 금액별 주거비 비교
+        </div>
+        <div style={{ overflowX: 'auto', maxHeight: 320, overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead style={{ position: 'sticky', top: 0, background: 'var(--pk5)', zIndex: 1 }}>
+              <tr>
+                {['월세', '필요현금(보증금)', '연 주거비', '전세환산가', '매매참고가'].map((h, hi) => (
+                  <th key={h} style={{ padding: '7px 3px', fontWeight: 700, color: hi === 1 ? '#e03060' : 'var(--pk)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1.5px solid var(--pk4)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 200].map(m => {
+                const isHighlight = monthly > 0 && Math.abs(m - monthly) < 6
+                const annualCost = m * 12
+                const jeonseEq = m * 100 + deposit
+                const buyEq = jeonseEq * 1.2
+                return (
+                  <tr key={m} style={{ background: isHighlight ? 'var(--pk5)' : undefined }}>
+                    <td style={{ padding: '5px 3px', textAlign: 'right', borderBottom: '1px solid var(--gray1)', fontWeight: isHighlight ? 800 : 400, color: isHighlight ? 'var(--pk)' : undefined }}>{fmt(m)}원/월</td>
+                    <td style={{ padding: '5px 3px', textAlign: 'right', borderBottom: '1px solid var(--gray1)', color: '#e03060' }}>{deposit > 0 ? fmt(deposit) + '원' : '-'}</td>
+                    <td style={{ padding: '5px 3px', textAlign: 'right', borderBottom: '1px solid var(--gray1)' }}>{fmt(annualCost)}원</td>
+                    <td style={{ padding: '5px 3px', textAlign: 'right', borderBottom: '1px solid var(--gray1)' }}>{deposit > 0 ? fmt(jeonseEq) + '원' : '-'}</td>
+                    <td style={{ padding: '5px 3px', textAlign: 'right', borderBottom: '1px solid var(--gray1)', color: 'var(--text2)' }}>{deposit > 0 ? fmt(buyEq) + '원' : '-'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>💡 보증금을 입력하면 전세환산가·매매참고가가 계산됩니다.</div>
       </CollapsibleCard>
 
       <CollapsibleCard title="참고 안내" defaultOpen={false}>
