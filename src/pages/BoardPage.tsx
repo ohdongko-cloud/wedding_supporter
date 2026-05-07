@@ -81,10 +81,11 @@ export default function BoardPage() {
       const allPosts = await BoardService.getPosts()
       setPosts(allPosts)
 
-      // URL 직링크 처리: #post-ID 또는 ?post=ID
+      // 직링크 처리: #post-ID, ?post=ID, 또는 navigate state.openPostId (홈 최신글 클릭)
       const hashId = location.hash.startsWith('#post-') ? location.hash.slice(6) : null
       const params = new URLSearchParams(location.search)
-      const postId = hashId || params.get('post')
+      const statePostId = (location.state as any)?.openPostId ?? null
+      const postId = hashId || params.get('post') || statePostId
       if (postId) {
         const target = allPosts.find(p => p.id === postId)
         if (target) {

@@ -7,10 +7,12 @@ import Layout from './components/layout/Layout'
 import DashboardPage from './pages/DashboardPage'
 import ChecklistPage from './pages/ChecklistPage'
 import CalculatorPage from './pages/CalculatorPage'
+import CalculatorTabPage from './pages/CalculatorTabPage'
 import HouseCalculatorPage from './pages/HouseCalculatorPage'
 import HoneymoonPlanPage from './pages/HoneymoonPlanPage'
 import BoardPage from './pages/BoardPage'
 import MemoPage from './pages/MemoPage'
+import SettingsPage from './pages/SettingsPage'
 import AdminPage from './pages/AdminPage'
 import SharedViewPage from './pages/SharedViewPage'
 import PrivacyPage from './pages/PrivacyPage'
@@ -61,11 +63,21 @@ export default function App() {
             <Routes>
               <Route path='/' element={<DashboardPage />} />
               <Route path='/checklist' element={<ChecklistPage />} />
+
+              {/* ── 네이티브 통합 계산기 탭 ── */}
+              <Route path='/calc' element={<CalculatorTabPage />} />
+
+              {/* ── 기존 개별 계산기 라우트 (웹 사이드바 + 딥링크 호환) ── */}
               <Route path='/honeymoon' element={<HoneymoonPlanPage />} />
               <Route path='/calc/house' element={<HouseCalculatorPage />} />
               <Route path='/calc/:type' element={<CalculatorPage />} />
+
               <Route path='/board' element={<BoardPage />} />
               <Route path='/memo' element={<MemoPage />} />
+
+              {/* ── 네이티브 설정 탭 ── */}
+              <Route path='/settings' element={<SettingsPage />} />
+
               <Route path='/admin' element={<AdminRoute><AdminPage /></AdminRoute>} />
               <Route path='*' element={<Navigate to='/' replace />} />
             </Routes>

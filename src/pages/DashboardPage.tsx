@@ -53,7 +53,10 @@ export default function DashboardPage() {
   const showOnboarding = !isGuest && userData.hasSeenOnboarding === false
 
   useEffect(() => {
-    BoardService.getPosts().then(posts => setRecentPosts(posts.slice(0, 4)))
+    // 공지글 제외, 최신 10개
+    BoardService.getPosts().then(posts =>
+      setRecentPosts(posts.filter(p => !p.isNotice).slice(0, 10))
+    )
   }, [])
 
   function completeOnboarding(date: string, budget: number, destination: 'dashboard' | 'calculator') {
@@ -228,19 +231,62 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent board posts */}
-      <div style={{ background: '#fff', borderRadius: 14, boxShadow: '0 4px 20px rgba(255,107,157,.1)', border: '1.5px solid var(--pk4)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--gray1)' }}>
-          <span style={{ fontSize: 14, fontWeight: 800 }}>📋 최근 게시글</span>
-          <button onClick={() => navigate('/board')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--pk)', fontWeight: 700 }}>전체보기 →</button>
+      {/* Recent board posts — 공지 제외, 최신 10개, 3줄 미리보기 */}
+      <div style={{ background: '#fff', borderRadius: 'var(--r-lg)', boxShadow: '0 4px 20px rgba(255,107,157,.1)', border: '1.5px solid var(--pk4)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(10px,3vw,14px) clamp(12px,3.5vw,16px)', borderBottom: '1px solid var(--gray1)' }}>
+          <span style={{ fontSize: 'var(--fs-base)', fontWeight: 800 }}>📋 최신 게시글</span>
+          <button onClick={() => navigate('/board')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-xs)', color: 'var(--pk)', fontWeight: 700 }}>전체보기 →</button>
         </div>
         {recentPosts.length === 0 ? (
-          <div style={{ padding: '20px 16px', fontSize: 13, color: 'var(--text2)', textAlign: 'center' }}>등록된 게시글이 없어요.</div>
+          <div style={{ padding: 'clamp(16px,5vw,24px)', fontSize: 'var(--fs-sm)', color: 'var(--text2)', textAlign: 'center' }}>
+            등록된 게시글이 없어요.
+          </div>
         ) : recentPosts.map((post, idx) => (
-          <div key={post.id} onClick={() => navigate('/board')} style={{ padding: '11px 16px', borderBottom: idx < recentPosts.length - 1 ? '1px solid var(--gray1)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {post.isNotice && <span style={{ background: 'var(--pk)', color: '#fff', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>공지</span>}
-            <span style={{ flex: 1, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</span>
-            <span style={{ fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>{post.author === 'admin' ? '주인장' : post.author}</span>
+          <div
+            key={post.id}
+            onClick={() => {
+              // 조회수 증가 후 게시판으로 이동 + 해당 게시글 상세 열기
+              navigate('/board', { state: { openPostId: post.id } })
+            }}
+            style={{
+              padding: 'clamp(10px,3vw,14px) clamp(12px,3.5vw,16px)',
+              borderBottom: idx < recentPosts.length - 1 ? '1px solid var(--gray1)' : 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {/* 제목 */}
+            <div style={{
+              fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              marginBottom: 4,
+            }}>
+              {post.title}
+            </div>
+            {/* 본문 앞부분 3줄 */}
+            {post.content && (
+              <div style={{
+                fontSize: 'var(--fs-xs)', color: 'var(--text2)',
+                lineHeight: 1.55,
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                marginBottom: 6,
+              }}>
+                {/* HTML 태그 제거 후 텍스트만 표시 */}
+                {post.content.replace(/<[^>]*>/g, '').replace(/&[a-z]+;/g, ' ').trim()}
+              </div>
+            )}
+            {/* 하단 메타: 작성자 · 조회수 · 좋아요 · 댓글 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--fs-xs)', color: 'var(--gray3)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text2)' }}>
+                {post.author === 'admin' ? '주인장' : post.author}
+              </span>
+              <span>·</span>
+              <span>👁 {post.views ?? 0}</span>
+              <span>❤️ {post.likes ?? 0}</span>
+              <span>💬 {(post.comments ?? []).length}</span>
+            </div>
           </div>
         ))}
       </div>

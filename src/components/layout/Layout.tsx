@@ -12,6 +12,12 @@ import ConflictModal from '../ConflictModal'
 import ShareModal from '../ShareModal'
 import PartnerInviteModal from '../PartnerInviteModal'
 
+const IS_NATIVE = Capacitor.isNativePlatform()
+
+// ── AdMob 배너 높이 (네이티브 전용) ─────────────────────────────
+const BANNER_H = IS_NATIVE ? 60 : 0
+
+// ── 앱 종료 확인 팝업 ───────────────────────────────────────────
 function ExitConfirmPopup({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
@@ -46,6 +52,7 @@ function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConf
   )
 }
 
+// ── 웹 전용 사이드바 네비게이션 항목 ─────────────────────────────
 const NAV_ITEMS: ({ path: string; label: string; icon: string; dividerAfter?: boolean })[] = [
   { path: '/', label: '홈', icon: '🏠' },
   { path: '/checklist', label: '전체 일정관리', icon: '✅' },
@@ -56,6 +63,16 @@ const NAV_ITEMS: ({ path: string; label: string; icon: string; dividerAfter?: bo
   { path: '/memo', label: '내 메모장', icon: '📝' },
 ]
 
+// ── 네이티브 전용 하단 탭바 항목 ─────────────────────────────────
+const NATIVE_TABS = [
+  { path: '/',          label: '홈',      icon: '🏠' },
+  { path: '/checklist', label: '체크리스트', icon: '✅' },
+  { path: '/calc',      label: '계산기',   icon: '🧮' },
+  { path: '/board',     label: '게시판',   icon: '📋' },
+  { path: '/settings',  label: '설정',     icon: '···' },
+]
+
+// ── 페이지 제목 ───────────────────────────────────────────────
 const PAGE_TITLES: Record<string, string> = {
   '/': '홈',
   '/checklist': '전체 일정관리',
@@ -65,47 +82,56 @@ const PAGE_TITLES: Record<string, string> = {
   '/honeymoon': '신혼여행 관리',
   '/calc/honeymoon': '신혼여행 비용 계산기',
   '/calc/house': '신혼집 마련',
+  '/calc': '계산기',
+  '/settings': '설정',
   '/admin': '관리자 페이지',
+}
+
+/** 네이티브 탭바에서 활성 탭 경로 판별 */
+function getActiveNativeTab(pathname: string): string {
+  if (pathname.startsWith('/calc'))     return '/calc'
+  if (pathname === '/settings' || pathname === '/memo') return '/settings'
+  return pathname
 }
 
 interface LayoutProps { children: React.ReactNode }
 
 export default function Layout({ children }: LayoutProps) {
-  const [sideOpen, setSideOpen] = useState(false)
+  const [sideOpen, setSideOpen]         = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [devRequestOpen, setDevRequestOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [leaveModal, setLeaveModal] = useState(false)
+  const [unreadCount, setUnreadCount]   = useState(0)
+  const [leaveModal, setLeaveModal]     = useState(false)
   const [conflictModal, setConflictModal] = useState(false)
-  const [shareModal, setShareModal] = useState(false)
-  const [shareUrl, setShareUrl] = useState('')
+  const [shareModal, setShareModal]     = useState(false)
+  const [shareUrl, setShareUrl]         = useState('')
   const [shareLoading, setShareLoading] = useState(false)
   const [partnerModal, setPartnerModal] = useState(false)
-  const [exitModal, setExitModal] = useState(false)
-  const pendingPath = useRef<string | null>(null)
-  const locationRef = useRef<string>('/')   // 항상 최신 경로를 추적
+  const [exitModal, setExitModal]       = useState(false)
+  const pendingPath   = useRef<string | null>(null)
+  const locationRef   = useRef<string>('/')
 
-  const location = useLocation()
-  const navigate = useNavigate()
+  const location  = useLocation()
+  const navigate  = useNavigate()
 
-  // location 변경 시 ref 동기화
   useEffect(() => { locationRef.current = location.pathname }, [location.pathname])
-  const user = useAuthStore(s => s.user)
-  const userData = useAuthStore(s => s.userData)
-  const isDirty = useAuthStore(s => s.isDirty)
-  const isSaving = useAuthStore(s => s.isSaving)
+
+  const user          = useAuthStore(s => s.user)
+  const userData      = useAuthStore(s => s.userData)
+  const isDirty       = useAuthStore(s => s.isDirty)
+  const isSaving      = useAuthStore(s => s.isSaving)
   const localUpdatedAt = useAuthStore(s => s.localUpdatedAt)
-  const logout = useAuthStore(s => s.logout)
+  const logout        = useAuthStore(s => s.logout)
   const deleteAccount = useAuthStore(s => s.deleteAccount)
-  const saveUserData = useAuthStore(s => s.saveUserData)
-  const forceSave = useAuthStore(s => s.forceSave)
+  const saveUserData  = useAuthStore(s => s.saveUserData)
+  const forceSave     = useAuthStore(s => s.forceSave)
   const forceLoadFromCloud = useAuthStore(s => s.forceLoadFromCloud)
 
   const isAdmin = user?.nick === 'admin'
   const isGuest = user?.nick === '게스트'
-  const title = PAGE_TITLES[location.pathname] ?? '결혼딸깍'
+  const title   = PAGE_TITLES[location.pathname] ?? '결혼딸깍'
 
-  // 웹 브라우저 뒤로가기/탭닫기 경고
+  // 웹 브라우저 뒤로가기 / 탭 닫기 경고
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (isDirty && !isGuest) { e.preventDefault(); e.returnValue = '' }
@@ -115,24 +141,20 @@ export default function Layout({ children }: LayoutProps) {
   }, [isDirty, isGuest])
 
   // Android 뒤로가기 버튼 처리
-  // - canGoBack(WebView 히스토리)은 SPA에서 신뢰할 수 없으므로 사용 안 함
-  // - locationRef로 현재 React Router 경로를 추적해 판단
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     let listener: any
     const setup = async () => {
       listener = await CapApp.addListener('backButton', () => {
-        // 사이드 메뉴 열려있으면 닫기
-        if (sideOpen) { setSideOpen(false); return }
+        // 웹에서만 사이드바 닫기 (네이티브는 사이드바 없음)
+        if (!IS_NATIVE && sideOpen) { setSideOpen(false); return }
 
-        // 변경사항 있으면 저장 다이얼로그
         if (isDirty && !isGuest) {
           pendingPath.current = '/'
           setLeaveModal(true)
           return
         }
 
-        // 홈이면 종료 확인 팝업, 그 외 탭은 홈으로 이동
         if (locationRef.current === '/') {
           setExitModal(true)
         } else {
@@ -142,7 +164,6 @@ export default function Layout({ children }: LayoutProps) {
     }
     setup()
     return () => { listener?.remove() }
-  // sideOpen도 의존성에 포함 — 메뉴 열림 상태를 핸들러가 즉시 참조
   }, [isDirty, isGuest, sideOpen, navigate])
 
   useEffect(() => {
@@ -227,41 +248,171 @@ export default function Layout({ children }: LayoutProps) {
     return `${ampm} ${h % 12 || 12}:${String(m).padStart(2, '0')}에 저장됨`
   }
 
+  // ── 네이티브 활성 탭 ────────────────────────────────────────
+  const activeNativeTab = getActiveNativeTab(location.pathname)
+
+  // ── 헤더 저장 버튼 공통 ────────────────────────────────────
+  const saveBtn = isGuest ? (
+    <button
+      onClick={() => navigate('/auth')}
+      style={{ background: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.5)', color: '#fff', borderRadius: 8, padding: 'clamp(4px,1.5vw,6px) clamp(8px,2.5vw,12px)', fontSize: 'var(--fs-sm)', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+    >
+      🔐 로그인
+    </button>
+  ) : (
+    <button
+      onClick={handleSave}
+      disabled={isSaving || !isDirty}
+      style={{
+        background: isDirty ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.1)',
+        border: `1px solid ${isDirty ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.25)'}`,
+        color: '#fff', borderRadius: 8,
+        padding: 'clamp(4px,1.5vw,5px) clamp(6px,2vw,10px)',
+        fontSize: 'var(--fs-sm)', fontWeight: 700,
+        cursor: isDirty && !isSaving ? 'pointer' : 'default',
+        transition: 'all .2s', whiteSpace: 'nowrap',
+      }}
+    >
+      {isSaving ? '저장 중...' : isDirty ? '💾 저장' : localUpdatedAt ? `✓ ${fmtSavedAt(localUpdatedAt)}` : '저장됨'}
+    </button>
+  )
+
+  // ══════════════════════════════════════════════════════════════
+  // 네이티브: 하단 탭바 레이아웃
+  // ══════════════════════════════════════════════════════════════
+  if (IS_NATIVE) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        {/* 공통 모달 */}
+        {exitModal      && <ExitConfirmPopup onConfirm={() => CapApp.exitApp()} onClose={() => setExitModal(false)} />}
+        {leaveModal     && <LeaveConfirmModal onSave={handleLeaveSave} onDiscard={handleLeaveDiscard} onCancel={handleLeaveCancel} />}
+        {conflictModal  && <ConflictModal onOverwrite={handleConflictOverwrite} onLoadServer={handleConflictLoadServer} />}
+        {/* 웹 전용 사이드바에서 쓰던 모달 — 네이티브에선 SettingsPage가 직접 관리하므로 없어도 되나,
+            헤더 저장/공유 버튼은 남아있으므로 shareModal/partnerModal은 유지 */}
+        {shareModal     && <ShareModal shareUrl={shareUrl} onClose={() => setShareModal(false)} />}
+        {partnerModal   && user && <PartnerInviteModal nick={user.nick} onClose={() => setPartnerModal(false)} />}
+        {devRequestOpen && <DevRequestModal onClose={() => setDevRequestOpen(false)} />}
+
+        {/* ── 상단 헤더 ── */}
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 200,
+          background: 'linear-gradient(135deg,var(--pk),var(--mn))',
+          display: 'flex', alignItems: 'center',
+          padding: '0 clamp(10px,3vw,16px)',
+          height: 'clamp(48px,12vw,56px)',
+          boxShadow: '0 2px 12px rgba(255,107,157,.3)',
+        }}>
+          {/* 현재 탭 제목 */}
+          <span style={{
+            flex: 1, color: '#fff',
+            fontSize: 'var(--fs-md)', fontWeight: 800,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {title}
+          </span>
+          {/* 저장 버튼 + 닉네임 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px,1.5vw,8px)', flexShrink: 0 }}>
+            {saveBtn}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'rgba(255,255,255,.85)', fontWeight: 600, maxWidth: 'clamp(50px,15vw,80px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {isGuest ? '게스트' : `${user?.nick}${isAdmin ? ' 🔑' : ''}`}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* ── 메인 콘텐츠 ── */}
+        {/* padding-bottom: AdMob 배너(60px) + 탭바(56px) + 여유(16px) */}
+        <main style={{
+          maxWidth: 960, margin: '0 auto',
+          padding: `clamp(12px,3.5vw,20px) clamp(10px,3vw,16px) ${BANNER_H + 56 + 16}px`,
+        }}>
+          {children}
+        </main>
+
+        {/* ── 하단 탭바 (AdMob 배너 위에 위치) ── */}
+        <nav style={{
+          position: 'fixed',
+          bottom: BANNER_H,           // AdMob 배너 높이만큼 위로
+          left: 0, right: 0,
+          height: 56,
+          background: '#fff',
+          borderTop: '1px solid var(--pk4)',
+          boxShadow: '0 -4px 20px rgba(255,107,157,.12)',
+          display: 'flex',
+          zIndex: 500,
+        }}>
+          {NATIVE_TABS.map(tab => {
+            const isActive = activeNativeTab === tab.path
+            return (
+              <button
+                key={tab.path}
+                onClick={() => go(tab.path)}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  paddingBottom: 4,
+                  color: isActive ? 'var(--pk)' : 'var(--gray3)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'color .15s',
+                }}
+              >
+                {/* 활성 탭 상단 인디케이터 */}
+                {isActive && (
+                  <div style={{
+                    position: 'absolute', top: 0, left: '25%', right: '25%',
+                    height: 3, borderRadius: '0 0 3px 3px',
+                    background: 'linear-gradient(90deg,var(--pk),var(--mn))',
+                  }} />
+                )}
+                <span style={{
+                  fontSize: tab.icon === '···' ? 22 : 'clamp(20px,5.5vw,24px)',
+                  letterSpacing: tab.icon === '···' ? '-2px' : 'normal',
+                  lineHeight: 1,
+                  fontWeight: tab.icon === '···' ? 900 : 'normal',
+                }}>
+                  {tab.icon}
+                </span>
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: isActive ? 800 : 500,
+                  letterSpacing: '-0.2px',
+                }}>
+                  {tab.label}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+    )
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 웹: 기존 사이드바 레이아웃 (변경 없음)
+  // ══════════════════════════════════════════════════════════════
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {exitModal && <ExitConfirmPopup onConfirm={() => CapApp.exitApp()} onClose={() => setExitModal(false)} />}
-      {deleteConfirm && <DeleteConfirmPopup nick={user?.nick ?? ''} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />}
+      {exitModal      && <ExitConfirmPopup onConfirm={() => CapApp.exitApp()} onClose={() => setExitModal(false)} />}
+      {deleteConfirm  && <DeleteConfirmPopup nick={user?.nick ?? ''} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />}
       {devRequestOpen && <DevRequestModal onClose={() => setDevRequestOpen(false)} />}
-      {leaveModal && <LeaveConfirmModal onSave={handleLeaveSave} onDiscard={handleLeaveDiscard} onCancel={handleLeaveCancel} />}
-      {conflictModal && <ConflictModal onOverwrite={handleConflictOverwrite} onLoadServer={handleConflictLoadServer} />}
-      {shareModal && <ShareModal shareUrl={shareUrl} onClose={() => setShareModal(false)} />}
-      {partnerModal && user && <PartnerInviteModal nick={user.nick} onClose={() => setPartnerModal(false)} />}
+      {leaveModal     && <LeaveConfirmModal onSave={handleLeaveSave} onDiscard={handleLeaveDiscard} onCancel={handleLeaveCancel} />}
+      {conflictModal  && <ConflictModal onOverwrite={handleConflictOverwrite} onLoadServer={handleConflictLoadServer} />}
+      {shareModal     && <ShareModal shareUrl={shareUrl} onClose={() => setShareModal(false)} />}
+      {partnerModal   && user && <PartnerInviteModal nick={user.nick} onClose={() => setPartnerModal(false)} />}
 
       <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'linear-gradient(135deg,var(--pk),var(--mn))', display: 'flex', alignItems: 'center', padding: '0 clamp(10px,3vw,16px)', height: 'clamp(48px,12vw,56px)', boxShadow: '0 2px 12px rgba(255,107,157,.3)' }}>
         <button data-tour="menu-button" onClick={() => setSideOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 'clamp(18px,5vw,22px)', cursor: 'pointer', padding: '6px 8px 6px 0', flexShrink: 0 }}>☰</button>
         <span style={{ flex: 1, textAlign: 'center', color: '#fff', fontSize: 'var(--fs-md)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px,1.5vw,8px)', flexShrink: 0 }}>
-          {isGuest ? (
-            <button
-              onClick={() => navigate('/auth')}
-              style={{ background: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.5)', color: '#fff', borderRadius: 8, padding: 'clamp(4px,1.5vw,6px) clamp(8px,2.5vw,12px)', fontSize: 'var(--fs-sm)', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              🔐 로그인
-            </button>
-          ) : (
-            <button
-              onClick={handleSave}
-              disabled={isSaving || !isDirty}
-              style={{
-                background: isDirty ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.1)',
-                border: `1px solid ${isDirty ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.25)'}`,
-                color: '#fff', borderRadius: 8, padding: 'clamp(4px,1.5vw,5px) clamp(6px,2vw,10px)', fontSize: 'var(--fs-sm)', fontWeight: 700,
-                cursor: isDirty && !isSaving ? 'pointer' : 'default', transition: 'all .2s', whiteSpace: 'nowrap',
-              }}
-            >
-              {isSaving ? '저장 중...' : isDirty ? '💾 저장' : localUpdatedAt ? `✓ ${fmtSavedAt(localUpdatedAt)}` : '저장됨'}
-            </button>
-          )}
+          {saveBtn}
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 'var(--fs-sm)', color: 'rgba(255,255,255,.85)', fontWeight: 600, maxWidth: 'clamp(50px,15vw,80px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {isGuest ? '게스트' : `${user?.nick}${isAdmin ? ' 🔑' : ''}`}

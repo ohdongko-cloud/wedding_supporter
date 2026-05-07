@@ -104,9 +104,9 @@ function getWeddingSeed(catKey: string, itemId: string): WeddingSeedItem | null 
   return catSeeds.find(s => s[0] === itemId) ?? null
 }
 
-export default function CalculatorPage() {
+export default function CalculatorPage({ typeOverride }: { typeOverride?: CalcType } = {}) {
   const { type = 'wedding' } = useParams<{ type: string }>()
-  const calcType = type as CalcType
+  const calcType = (typeOverride ?? type) as CalcType
   const location = useLocation()
   const userData = useAuthStore(s => s.userData)!
   const setUserData = useAuthStore(s => s.setUserData)
