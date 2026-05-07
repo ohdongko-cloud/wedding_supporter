@@ -11,6 +11,11 @@ import LeaveConfirmModal from '../LeaveConfirmModal'
 import ConflictModal from '../ConflictModal'
 import ShareModal from '../ShareModal'
 import PartnerInviteModal from '../PartnerInviteModal'
+import {
+  HomeIcon, ChecklistIcon, CalculatorIcon, BoardIcon, SettingsIcon,
+  RingIcon, PlaneIcon, HouseHeartIcon, NoteIcon,
+  PartnerIcon, LinkIcon, ChatIcon, LogoutIcon, TrashIcon, KeyIcon,
+} from '../icons/AppIcons'
 
 // ── 네이티브 / 프리뷰 모드 감지 ────────────────────────────────
 // ?native=1  → 프리뷰 모드 ON (localStorage에 저장)
@@ -63,24 +68,26 @@ function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConf
   )
 }
 
-// ── 웹 전용 사이드바 네비게이션 항목 ─────────────────────────────
-const NAV_ITEMS: ({ path: string; label: string; icon: string; dividerAfter?: boolean })[] = [
-  { path: '/', label: '홈', icon: '🏠' },
-  { path: '/checklist', label: '전체 일정관리', icon: '✅' },
-  { path: '/calc/wedding', label: '결혼식 비용 계산기', icon: '💒' },
-  { path: '/honeymoon', label: '신혼여행 관리', icon: '✈️' },
-  { path: '/calc/house', label: '신혼집 마련', icon: '🏡', dividerAfter: true },
-  { path: '/board', label: '공개 게시판', icon: '📋' },
-  { path: '/memo', label: '내 메모장', icon: '📝' },
+// ── 웹 전용 사이드바 네비게이션 항목 (SVG 아이콘 사용) ─────────────
+type NavItem = { path: string; label: string; Icon: React.ComponentType<{ size?: number; active?: boolean }>; dividerAfter?: boolean }
+const NAV_ITEMS: NavItem[] = [
+  { path: '/',             label: '홈',              Icon: HomeIcon },
+  { path: '/checklist',   label: '전체 일정관리',    Icon: ChecklistIcon },
+  { path: '/calc/wedding', label: '결혼식 비용 계산기', Icon: RingIcon },
+  { path: '/honeymoon',   label: '신혼여행 관리',    Icon: PlaneIcon },
+  { path: '/calc/house',  label: '신혼집 마련',      Icon: HouseHeartIcon, dividerAfter: true },
+  { path: '/board',       label: '공개 게시판',      Icon: BoardIcon },
+  { path: '/memo',        label: '내 메모장',        Icon: NoteIcon },
 ]
 
-// ── 네이티브 전용 하단 탭바 항목 ─────────────────────────────────
-const NATIVE_TABS = [
-  { path: '/',          label: '홈',      icon: '🏠' },
-  { path: '/checklist', label: '체크리스트', icon: '✅' },
-  { path: '/calc',      label: '계산기',   icon: '🧮' },
-  { path: '/board',     label: '게시판',   icon: '📋' },
-  { path: '/settings',  label: '설정',     icon: '···' },
+// ── 네이티브 전용 하단 탭바 항목 (SVG 아이콘 컴포넌트 사용) ─────────
+type NativeTabItem = { path: string; label: string; Icon: React.ComponentType<{ size?: number; active?: boolean }> }
+const NATIVE_TABS: NativeTabItem[] = [
+  { path: '/',          label: '홈',      Icon: HomeIcon },
+  { path: '/checklist', label: '체크리스트', Icon: ChecklistIcon },
+  { path: '/calc',      label: '계산기',   Icon: CalculatorIcon },
+  { path: '/board',     label: '게시판',   Icon: BoardIcon },
+  { path: '/settings',  label: '설정',     Icon: SettingsIcon },
 ]
 
 // ── 페이지 제목 ───────────────────────────────────────────────
@@ -381,12 +388,12 @@ export default function Layout({ children }: LayoutProps) {
           display: 'flex',
           zIndex: 500,
         }}>
-          {NATIVE_TABS.map(tab => {
-            const isActive = activeNativeTab === tab.path
+          {NATIVE_TABS.map(({ path, label, Icon }) => {
+            const isActive = activeNativeTab === path
             return (
               <button
-                key={tab.path}
-                onClick={() => go(tab.path)}
+                key={path}
+                onClick={() => go(path)}
                 style={{
                   flex: 1,
                   border: 'none',
@@ -395,36 +402,29 @@ export default function Layout({ children }: LayoutProps) {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 2,
+                  gap: 3,
                   paddingBottom: 4,
-                  color: isActive ? 'var(--pk)' : 'var(--gray3)',
                   cursor: 'pointer',
                   position: 'relative',
-                  transition: 'color .15s',
+                  transition: 'opacity .15s',
                 }}
               >
-                {/* 활성 탭 상단 인디케이터 */}
+                {/* 활성 탭 상단 인디케이터 바 */}
                 {isActive && (
                   <div style={{
-                    position: 'absolute', top: 0, left: '25%', right: '25%',
-                    height: 3, borderRadius: '0 0 3px 3px',
+                    position: 'absolute', top: 0, left: '22%', right: '22%',
+                    height: 3, borderRadius: '0 0 4px 4px',
                     background: 'linear-gradient(90deg,var(--pk),var(--mn))',
                   }} />
                 )}
-                <span style={{
-                  fontSize: tab.icon === '···' ? 22 : 'clamp(20px,5.5vw,24px)',
-                  letterSpacing: tab.icon === '···' ? '-2px' : 'normal',
-                  lineHeight: 1,
-                  fontWeight: tab.icon === '···' ? 900 : 'normal',
-                }}>
-                  {tab.icon}
-                </span>
+                <Icon size={23} active={isActive} />
                 <span style={{
                   fontSize: 10,
                   fontWeight: isActive ? 800 : 500,
+                  color: isActive ? 'var(--pk)' : 'var(--gray3)',
                   letterSpacing: '-0.2px',
                 }}>
-                  {tab.label}
+                  {label}
                 </span>
               </button>
             )
@@ -468,17 +468,25 @@ export default function Layout({ children }: LayoutProps) {
           <div style={{ fontSize: 'var(--fs-sm)', opacity: .8, marginTop: 4 }}>결혼딸깍</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
-          {NAV_ITEMS.map(item => (
-            <div key={item.path}>
-              <button onClick={() => go(item.path)} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,2.5vw,12px)', padding: 'clamp(11px,3vw,13px) clamp(14px,4vw,20px)', width: '100%', border: 'none', background: location.pathname === item.path ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-base)', fontWeight: 600, color: location.pathname === item.path ? 'var(--pk)' : 'var(--text)' }}>
-                <span style={{ fontSize: 'var(--fs-lg)', width: 24, textAlign: 'center' }}>{item.icon}</span>{item.label}
-              </button>
-              {item.dividerAfter && <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />}
-            </div>
-          ))}
+          {NAV_ITEMS.map(item => {
+            const isActive = location.pathname === item.path
+            return (
+              <div key={item.path}>
+                <button onClick={() => go(item.path)} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,2.5vw,12px)', padding: 'clamp(11px,3vw,13px) clamp(14px,4vw,20px)', width: '100%', border: 'none', background: isActive ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-base)', fontWeight: 600, color: isActive ? 'var(--pk)' : 'var(--text)' }}>
+                  <span style={{ width: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <item.Icon size={22} active={isActive} />
+                  </span>
+                  {item.label}
+                </button>
+                {item.dividerAfter && <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />}
+              </div>
+            )
+          })}
           {isAdmin && (
             <button onClick={() => go('/admin')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: location.pathname === '/admin' ? 'var(--pk5)' : 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: location.pathname === '/admin' ? 'var(--pk)' : 'var(--text)' }}>
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔧</span>
+              <span style={{ width: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <SettingsIcon size={22} active={location.pathname === '/admin'} />
+              </span>
               관리자 페이지
               {unreadCount > 0 && (
                 <span style={{ marginLeft: 'auto', background: '#e03060', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{unreadCount}</span>
@@ -488,38 +496,31 @@ export default function Layout({ children }: LayoutProps) {
           <hr style={{ margin: '6px 16px', border: 'none', borderTop: '1px solid var(--gray2)' }} />
           {!isGuest && (
             <>
-              <button
-                onClick={() => { setSideOpen(false); setPartnerModal(true) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}
-              >
-                <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>👫</span>
+              <button onClick={() => { setSideOpen(false); setPartnerModal(true) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}>
+                <span style={{ width: 26, display: 'flex', alignItems: 'center' }}><PartnerIcon size={22} /></span>
                 파트너와 함께 사용하기
               </button>
-              <button
-                onClick={handleShare}
-                disabled={shareLoading}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}
-              >
-                <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔗</span>
+              <button onClick={handleShare} disabled={shareLoading} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}>
+                <span style={{ width: 26, display: 'flex', alignItems: 'center' }}><LinkIcon size={22} /></span>
                 {shareLoading ? '링크 생성 중...' : '결과 공유하기'}
               </button>
             </>
           )}
           <button onClick={() => { setSideOpen(false); setDevRequestOpen(true) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--pk)' }}>
-            <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>💬</span>개선 요청
+            <span style={{ width: 26, display: 'flex', alignItems: 'center' }}><ChatIcon size={22} /></span>개선 요청
           </button>
           {isGuest ? (
             <button onClick={() => { setSideOpen(false); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: 'var(--pk)' }}>
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🔐</span>로그인 / 회원가입
+              <span style={{ width: 26, display: 'flex', alignItems: 'center' }}><KeyIcon size={22} /></span>로그인 / 회원가입
             </button>
           ) : (
             <button onClick={() => { logout(); navigate('/auth') }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🚪</span>로그아웃
+              <span style={{ width: 26, display: 'flex', alignItems: 'center' }}><LogoutIcon size={22} /></span>로그아웃
             </button>
           )}
           {!isGuest && !isAdmin && (
             <button onClick={() => setDeleteConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#e03060' }}>
-              <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>🗑️</span>초기화 및 삭제
+              <span style={{ width: 26, display: 'flex', alignItems: 'center' }}><TrashIcon size={22} /></span>초기화 및 삭제
             </button>
           )}
         </div>

@@ -2,6 +2,10 @@ import { useState } from 'react'
 
 declare global { interface Window { Kakao: any } }
 
+// Android WebView에서는 window.location.origin이 localhost가 되므로 항상 실제 도메인 사용
+const PROD_ORIGIN = 'https://weddingsupporter.vercel.app'
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.ddalkag.wedding'
+
 interface Props {
   shareUrl: string
   onClose: () => void
@@ -34,10 +38,30 @@ export default function ShareModal({ shareUrl, onClose }: Props) {
         content: {
           title: '결혼 준비 현황 공유 💍',
           description: '내 결혼 준비 현황을 확인해보세요!',
-          imageUrl: `${window.location.origin}/og-image.png`,
-          link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
+          // 네이티브에서는 window.location.origin이 localhost → 항상 PROD_ORIGIN 사용
+          imageUrl: `${PROD_ORIGIN}/og-image.png`,
+          link: {
+            mobileWebUrl: shareUrl,
+            webUrl: shareUrl,
+          },
         },
-        buttons: [{ title: '결혼 준비 현황 보기', link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
+        buttons: [
+          {
+            // 앱 미설치 사용자 → 웹으로 바로 열기
+            title: '웹으로 보기',
+            link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
+          },
+          {
+            // 앱 설치로 이동
+            title: '앱으로 보기',
+            link: {
+              mobileWebUrl: PLAY_STORE_URL,
+              webUrl: PLAY_STORE_URL,
+              androidExecutionParams: `shareUrl=${encodeURIComponent(shareUrl)}`,
+              androidDownloadUrl: PLAY_STORE_URL,
+            },
+          },
+        ],
       })
       setKakaoSent(true)
       setTimeout(() => setKakaoSent(false), 2500)
@@ -85,6 +109,12 @@ export default function ShareModal({ shareUrl, onClose }: Props) {
             </>
           )}
         </button>
+
+        {kakaoSent && (
+          <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', marginBottom: 8, lineHeight: 1.5 }}>
+            받는 분이 <b>웹으로 보기</b> 또는 <b>앱으로 보기</b>를 선택할 수 있어요
+          </div>
+        )}
 
         <button
           onClick={copyLink}

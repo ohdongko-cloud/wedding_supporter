@@ -5,6 +5,10 @@ import { ShareService } from '../services/shareService'
 import DevRequestModal from '../components/DevRequestModal'
 import ShareModal from '../components/ShareModal'
 import PartnerInviteModal from '../components/PartnerInviteModal'
+import {
+  NoteIcon, PartnerIcon, LinkIcon, ChatIcon, PrivacyIcon,
+  InfoIcon, LogoutIcon, TrashIcon, KeyIcon, WrenchIcon,
+} from '../components/icons/AppIcons'
 
 // ── 회원 탈퇴 확인 팝업 ──────────────────────────────────────────
 function DeleteConfirmPopup({ nick, onConfirm, onClose }: { nick: string; onConfirm: () => void; onClose: () => void }) {
@@ -41,9 +45,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 // ── 설정 행 ───────────────────────────────────────────────────
-function Row({ icon, label, sub, onClick, danger, disabled }: {
-  icon: string; label: string; sub?: string
-  onClick?: () => void; danger?: boolean; disabled?: boolean
+function Row({ icon, label, sub, onClick, danger, disabled, last }: {
+  icon: React.ReactNode; label: string; sub?: string
+  onClick?: () => void; danger?: boolean; disabled?: boolean; last?: boolean
 }) {
   return (
     <button
@@ -54,26 +58,19 @@ function Row({ icon, label, sub, onClick, danger, disabled }: {
         padding: 'clamp(13px,3.5vw,15px) clamp(14px,4vw,18px)',
         width: '100%', border: 'none', background: 'none',
         textAlign: 'left', cursor: onClick ? 'pointer' : 'default',
-        borderBottom: '1px solid var(--gray1)',
+        borderBottom: last ? 'none' : '1px solid var(--gray1)',
         opacity: disabled ? 0.45 : 1,
       }}
     >
-      <span style={{ fontSize: 'clamp(18px,5vw,22px)', width: 26, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+      <span style={{ width: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {icon}
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: danger ? '#e03060' : 'var(--text)' }}>{label}</div>
         {sub && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text2)', marginTop: 2 }}>{sub}</div>}
       </div>
-      {onClick && <span style={{ color: 'var(--gray3)', fontSize: 14 }}>›</span>}
+      {onClick && <span style={{ color: 'var(--gray3)', fontSize: 16 }}>›</span>}
     </button>
-  )
-}
-
-// ── 마지막 Row (border 없음) ──────────────────────────────────
-function LastRow(props: Parameters<typeof Row>[0]) {
-  return (
-    <div style={{ borderBottom: 'none' }}>
-      <Row {...props} />
-    </div>
   )
 }
 
@@ -159,52 +156,48 @@ export default function SettingsPage() {
 
       {/* ── 기능 ── */}
       <Section title="기능">
-        <Row icon="📝" label="내 메모장" onClick={() => navigate('/memo')} />
+        <Row icon={<NoteIcon />} label="내 메모장" onClick={() => navigate('/memo')} />
         {!isGuest && (
-          <Row
-            icon="👫"
-            label="파트너와 함께 사용하기"
-            sub="초대 링크로 파트너 초대"
-            onClick={() => setPartnerModal(true)}
-          />
+          <Row icon={<PartnerIcon />} label="파트너와 함께 사용하기" sub="초대 링크로 파트너 초대" onClick={() => setPartnerModal(true)} />
         )}
         {!isGuest && (
-          <LastRow
-            icon="🔗"
+          <Row
+            icon={<LinkIcon />}
             label={shareLoading ? '링크 생성 중...' : '결과 공유하기'}
             sub="준비 현황을 링크로 공유"
             onClick={handleShare}
             disabled={shareLoading}
+            last
           />
         )}
         {isGuest && (
-          <LastRow icon="🔗" label="결과 공유하기" sub="로그인 후 이용 가능" disabled />
+          <Row icon={<LinkIcon />} label="결과 공유하기" sub="로그인 후 이용 가능" disabled last />
         )}
       </Section>
 
       {/* ── 지원 ── */}
       <Section title="지원">
-        <Row icon="💬" label="개선 요청" sub="불편한 점이나 원하는 기능을 알려주세요" onClick={() => setDevRequestOpen(true)} />
-        <LastRow icon="🔒" label="개인정보 처리방침" onClick={() => navigate('/privacy')} />
+        <Row icon={<ChatIcon />} label="개선 요청" sub="불편한 점이나 원하는 기능을 알려주세요" onClick={() => setDevRequestOpen(true)} />
+        <Row icon={<PrivacyIcon />} label="개인정보 처리방침" onClick={() => navigate('/privacy')} last />
       </Section>
 
       {/* ── 앱 정보 ── */}
       <Section title="앱 정보">
-        <LastRow icon="ℹ️" label="버전" sub="v1.0.3" />
+        <Row icon={<InfoIcon />} label="버전" sub="v1.1.0" last />
       </Section>
 
       {/* ── 계정 ── */}
       <Section title="계정">
         {isGuest ? (
-          <LastRow icon="🔐" label="로그인 / 회원가입" onClick={() => navigate('/auth')} />
+          <Row icon={<KeyIcon />} label="로그인 / 회원가입" onClick={() => navigate('/auth')} last />
         ) : (
           <>
-            <Row icon="🚪" label="로그아웃" onClick={handleLogout} />
+            <Row icon={<LogoutIcon />} label="로그아웃" onClick={handleLogout} />
             {!isAdmin && (
-              <LastRow icon="🗑️" label="초기화 및 삭제" danger onClick={() => setDeleteConfirm(true)} />
+              <Row icon={<TrashIcon />} label="초기화 및 삭제" danger onClick={() => setDeleteConfirm(true)} last />
             )}
             {isAdmin && (
-              <LastRow icon="🔧" label="관리자 페이지" onClick={() => navigate('/admin')} />
+              <Row icon={<WrenchIcon />} label="관리자 페이지" onClick={() => navigate('/admin')} last />
             )}
           </>
         )}

@@ -214,6 +214,7 @@ export default function BoardPage() {
     if (kakao && key) {
       try { if (!kakao.isInitialized()) kakao.init(key) } catch { /* ignore */ }
     }
+    const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.ddalkag.wedding'
     if (kakao && kakao.isInitialized?.()) {
       kakao.Share.sendDefault({
         objectType: 'feed',
@@ -223,7 +224,23 @@ export default function BoardPage() {
           imageUrl,
           link: { mobileWebUrl: url, webUrl: url },
         },
-        buttons: [{ title: '꿀정보 확인하기', link: { mobileWebUrl: url, webUrl: url } }],
+        buttons: [
+          {
+            // 앱 미설치 사용자 → 웹으로 바로 열기
+            title: '웹으로 보기',
+            link: { mobileWebUrl: url, webUrl: url },
+          },
+          {
+            // 앱 설치로 이동
+            title: '앱으로 보기',
+            link: {
+              mobileWebUrl: PLAY_STORE_URL,
+              webUrl: PLAY_STORE_URL,
+              androidExecutionParams: `postId=${post.id}`,
+              androidDownloadUrl: PLAY_STORE_URL,
+            },
+          },
+        ],
       })
       return
     }

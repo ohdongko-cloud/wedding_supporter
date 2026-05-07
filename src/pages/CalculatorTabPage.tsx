@@ -2,13 +2,14 @@ import { useState } from 'react'
 import CalculatorPage from './CalculatorPage'
 import HouseCalculatorPage from './HouseCalculatorPage'
 import HoneymoonPlanPage from './HoneymoonPlanPage'
+import { RingIcon, HouseHeartIcon, PlaneIcon } from '../components/icons/AppIcons'
 
 type CalcTab = 'wedding' | 'house' | 'honeymoon'
 
-const TABS: { key: CalcTab; label: string; emoji: string }[] = [
-  { key: 'wedding', label: '결혼비용', emoji: '💒' },
-  { key: 'house',   label: '신혼집',   emoji: '🏡' },
-  { key: 'honeymoon', label: '신혼여행', emoji: '✈️' },
+const TABS: { key: CalcTab; label: string; Icon: React.ComponentType<{ size?: number; active?: boolean; color?: string }> }[] = [
+  { key: 'wedding',   label: '결혼비용',  Icon: RingIcon },
+  { key: 'house',     label: '신혼집',    Icon: HouseHeartIcon },
+  { key: 'honeymoon', label: '신혼여행',  Icon: PlaneIcon },
 ]
 
 export default function CalculatorTabPage() {
@@ -27,12 +28,12 @@ export default function CalculatorTabPage() {
         boxShadow: '0 2px 12px rgba(255,107,157,.08)',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        {TABS.map(tab => {
-          const isActive = active === tab.key
+        {TABS.map(({ key, label, Icon }) => {
+          const isActive = active === key
           return (
             <button
-              key={tab.key}
-              onClick={() => setActive(tab.key)}
+              key={key}
+              onClick={() => setActive(key)}
               style={{
                 flex: 1,
                 padding: 'clamp(8px,2.5vw,11px) 4px',
@@ -41,19 +42,26 @@ export default function CalculatorTabPage() {
                 background: isActive
                   ? 'linear-gradient(135deg, var(--pk), var(--mn))'
                   : 'transparent',
-                color: isActive ? '#fff' : 'var(--text2)',
-                fontSize: 'var(--fs-sm)',
-                fontWeight: 700,
                 cursor: 'pointer',
                 transition: 'all .2s',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 3,
+                gap: 4,
               }}
             >
-              <span style={{ fontSize: 'clamp(18px,5vw,22px)' }}>{tab.emoji}</span>
-              <span>{tab.label}</span>
+              {/* 활성 탭: 흰색 아이콘 (SVG color prop), 비활성: 그라데이션 아이콘 */}
+              {isActive
+                ? <Icon size={22} color="white" />
+                : <Icon size={22} active={false} />
+              }
+              <span style={{
+                fontSize: 'var(--fs-sm)',
+                fontWeight: 700,
+                color: isActive ? '#fff' : 'var(--text2)',
+              }}>
+                {label}
+              </span>
             </button>
           )
         })}
