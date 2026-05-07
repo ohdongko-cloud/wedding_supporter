@@ -12,10 +12,21 @@ import ConflictModal from '../ConflictModal'
 import ShareModal from '../ShareModal'
 import PartnerInviteModal from '../PartnerInviteModal'
 
-const IS_NATIVE = Capacitor.isNativePlatform()
+// ── 네이티브 / 프리뷰 모드 감지 ────────────────────────────────
+// ?native=1  → 프리뷰 모드 ON (localStorage에 저장)
+// ?native=0  → 프리뷰 모드 OFF
+;(() => {
+  const p = new URLSearchParams(window.location.search).get('native')
+  if (p === '1') localStorage.setItem('_native_preview', '1')
+  else if (p === '0') localStorage.removeItem('_native_preview')
+})()
 
-// ── AdMob 배너 높이 (네이티브 전용) ─────────────────────────────
-const BANNER_H = IS_NATIVE ? 60 : 0
+const IS_ACTUAL_NATIVE  = Capacitor.isNativePlatform()
+const IS_PREVIEW_NATIVE = !IS_ACTUAL_NATIVE && localStorage.getItem('_native_preview') === '1'
+const IS_NATIVE         = IS_ACTUAL_NATIVE || IS_PREVIEW_NATIVE
+
+// 실제 네이티브에만 AdMob 배너 높이 적용 (프리뷰에는 배너 없음)
+const BANNER_H = IS_ACTUAL_NATIVE ? 60 : 0
 
 // ── 앱 종료 확인 팝업 ───────────────────────────────────────────
 function ExitConfirmPopup({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
@@ -283,6 +294,31 @@ export default function Layout({ children }: LayoutProps) {
   if (IS_NATIVE) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        {/* ── 프리뷰 모드 안내 바 (실제 기기에서는 표시 안 됨) ── */}
+        {IS_PREVIEW_NATIVE && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+            background: 'rgba(61,26,36,.92)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            padding: '6px 12px', fontSize: 11, fontWeight: 600,
+            backdropFilter: 'blur(4px)',
+          }}>
+            <span>📱 네이티브 UI 프리뷰 모드</span>
+            <button
+              onClick={() => {
+                localStorage.removeItem('_native_preview')
+                window.location.replace('/')
+              }}
+              style={{
+                background: 'rgba(255,255,255,.2)', border: '1px solid rgba(255,255,255,.4)',
+                color: '#fff', borderRadius: 5, padding: '2px 8px',
+                fontSize: 10, cursor: 'pointer', fontWeight: 700,
+              }}
+            >
+              프리뷰 종료
+            </button>
+          </div>
+        )}
         {/* 공통 모달 */}
         {exitModal      && <ExitConfirmPopup onConfirm={() => CapApp.exitApp()} onClose={() => setExitModal(false)} />}
         {leaveModal     && <LeaveConfirmModal onSave={handleLeaveSave} onDiscard={handleLeaveDiscard} onCancel={handleLeaveCancel} />}
@@ -293,9 +329,12 @@ export default function Layout({ children }: LayoutProps) {
         {partnerModal   && user && <PartnerInviteModal nick={user.nick} onClose={() => setPartnerModal(false)} />}
         {devRequestOpen && <DevRequestModal onClose={() => setDevRequestOpen(false)} />}
 
+        {/* 프리뷰 바 높이 보상 스페이서 */}
+        {IS_PREVIEW_NATIVE && <div style={{ height: 32 }} />}
+
         {/* ── 상단 헤더 ── */}
         <header style={{
-          position: 'sticky', top: 0, zIndex: 200,
+          position: 'sticky', top: IS_PREVIEW_NATIVE ? 32 : 0, zIndex: 200,
           background: 'linear-gradient(135deg,var(--pk),var(--mn))',
           display: 'flex', alignItems: 'center',
           padding: '0 clamp(10px,3vw,16px)',
