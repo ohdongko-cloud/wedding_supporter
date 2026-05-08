@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import * as Sentry from '@sentry/react'
 import { useAuthStore, seedAdminUser } from './stores/authStore'
 import AuthPage from './pages/AuthPage'
 import Layout from './components/layout/Layout'
+import SplashScreen, { shouldShowSplash } from './components/SplashScreen'
 import DashboardPage from './pages/DashboardPage'
 import ChecklistPage from './pages/ChecklistPage'
 import CalculatorPage from './pages/CalculatorPage'
@@ -48,11 +49,13 @@ function AppFallback({ error }: { error: Error }) {
 
 export default function App() {
   const user = useAuthStore(s => s.user)
+  const [showSplash, setShowSplash] = useState(shouldShowSplash)
 
   useEffect(() => { seedAdminUser() }, [])
 
   return (
     <Sentry.ErrorBoundary fallback={({ error }) => <AppFallback error={error as Error} />} showDialog={false}>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
     <Routes>
       <Route path='/auth' element={(user && user.nick !== '게스트') ? <Navigate to='/' replace /> : <AuthPage />} />
       <Route path='/view/:shareToken' element={<SharedViewPage />} />

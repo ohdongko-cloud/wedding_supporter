@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>체크리스트 UI 개선 목업</title>
+<style>
+  :root {
+    --pk: #ff6b9d; --pk2: #ff8fab; --pk3: #ffb3c6; --pk4: #ffd6e0; --pk5: #fff0f3;
+    --mn: #c77dff; --gr: #06d6a0; --bl: #4cc9f0; --or: #ff9a3c;
+    --bg: #fff5f7; --gray1: #fef0f3; --gray2: #f5d5de; --gray3: #c9a0ac;
+    --text: #3d1a24; --text2: #7a4a57;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',-apple-system,sans-serif; background: #f0f0f0; color: var(--text); font-size: 14px; }
+
+  .wrapper { display: flex; gap: 24px; padding: 24px; justify-content: center; flex-wrap: wrap; }
+  .phone { width: 360px; background: var(--bg); border-radius: 24px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,.18); }
+  .phone-header { background: linear-gradient(135deg,var(--pk),var(--mn)); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .phone-header span { color: #fff; font-weight: 800; font-size: 15px; }
+  .phone-header small { color: rgba(255,255,255,.8); font-size: 12px; }
+  .phone-body { padding: 14px 14px 80px; max-height: 760px; overflow-y: auto; }
+
+  .label-tag { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700; flex-shrink: 0; }
+  .label-required { background: #ffe0ea; color: #e03060; }
+  .label-optional { background: #e8f4ff; color: #4a80ee; }
+  .label-custom { background: #f0e8ff; color: #8a4a9e; }
+
+  /* ── 공통 카드 ── */
+  .card { background: #fff; border-radius: 14px; margin-bottom: 10px; box-shadow: 0 4px 20px rgba(255,107,157,.1); overflow: hidden; border: 1.5px solid var(--pk4); }
+
+  /* ── 헤더 배너 ── */
+  .banner { background: linear-gradient(135deg,var(--pk),var(--mn)); border-radius: 14px; padding: 16px; margin-bottom: 14px; color: #fff; }
+  .banner-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .banner-pct { font-size: 32px; font-weight: 900; line-height: 1; }
+  .banner-sub { font-size: 11px; color: rgba(255,255,255,.8); margin-top: 3px; }
+  .banner-rem { font-size: 24px; font-weight: 800; text-align: right; }
+  .progress-bar { height: 8px; background: rgba(255,255,255,.25); border-radius: 4px; }
+  .progress-fill { height: 100%; background: #fff; border-radius: 4px; transition: width .5s; }
+
+  /* ── 스테이지 헤더 ── */
+  .stage-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; }
+  .stage-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; }
+  .stage-step { color: var(--pk); font-size: 11px; font-weight: 800; }
+  .stage-badge { background: var(--pk5); color: var(--pk); border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+  .stage-arrow { font-size: 11px; color: var(--text2); }
+
+  /* ── OLD: 아이템 행 ── */
+  .item-old { border-bottom: 1px solid var(--gray1); padding: 8px 6px 4px; }
+  .item-old-row { display: flex; align-items: center; gap: 8px; padding-bottom: 3px; }
+  .item-old-title { flex: 1; font-size: 13px; }
+  .item-old-deadline { display: flex; align-items: center; gap: 6px; padding-left: 26px; padding-bottom: 5px; }
+  .item-old-deadline span { font-size: 10px; color: var(--text2); }
+  .deadline-input { font-size: 11px; border: 1px solid var(--gray2); border-radius: 6px; padding: 3px 8px; color: var(--text); background: var(--pk5); }
+  .dday-badge { font-size: 10px; color: var(--pk); font-weight: 700; }
+  .info-btn { background: none; border: none; cursor: pointer; font-size: 13px; color: var(--text2); padding: 2px; }
+
+  /* ── NEW: 아이템 행 ── */
+  .item-new { border-bottom: 1px solid var(--gray1); padding: 10px 14px; display: flex; align-items: flex-start; gap: 10; }
+  .item-new:last-child { border-bottom: none; }
+  .item-new-left { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+  .item-new-check { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--pk3); background: #fff; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .item-new-check.done { background: var(--pk); border-color: var(--pk); }
+  .checkmark { color: #fff; font-size: 12px; font-weight: 900; }
+  .item-new-content { flex: 1; min-width: 0; }
+  .item-new-title { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.4; }
+  .item-new-title.done { text-decoration: line-through; color: var(--text2); }
+  .item-new-date { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+  .date-label { font-size: 10px; color: var(--gray3); }
+  .date-chip { background: var(--pk5); border: 1px solid var(--pk4); border-radius: 6px; padding: '2px 8px'; font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; }
+  .date-chip-icon { font-size: 10px; }
+  .dday-chip { background: var(--pk); color: #fff; border-radius: 20px; padding: 1px 7px; font-size: 10px; font-weight: 700; }
+  .dday-chip.urgent { background: var(--or); }
+  .item-new-info { color: var(--pk3); font-size: 15px; flex-shrink: 0; background: none; border: none; cursor: pointer; padding: 0 0 0 4px; align-self: center; }
+
+  /* ── 완료 섹션 ── */
+  .done-toggle { display: flex; align-items: center; gap: 6px; padding: 8px 14px; cursor: pointer; font-size: 11px; color: var(--text2); font-weight: 600; background: var(--gray1); }
+  .done-toggle-icon { font-size: 10px; }
+
+  /* ── 항목 추가 ── */
+  .add-row { display: flex; gap: 8px; padding: 10px 14px; background: var(--pk5); }
+  .add-input { flex: 1; border: 1.5px solid var(--pk4); border-radius: 8px; padding: 7px 10px; font-size: 12px; outline: none; background: #fff; color: var(--text); }
+  .add-btn { background: var(--pk); color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+  /* ── 스테이지 진행바 (NEW) ── */
+  .stage-prog { height: 3px; background: var(--pk4); margin: 0 16px 12px; border-radius: 2px; }
+  .stage-prog-fill { height: 100%; background: linear-gradient(90deg,var(--pk),var(--mn)); border-radius: 2px; transition: width .4s; }
+
+  /* 레이블 */
+  .col-label { text-align: center; font-size: 13px; font-weight: 800; color: var(--text2); padding: 12px 0 8px; }
+  .version-tag { display: inline-block; background: var(--pk5); border: 1.5px solid var(--pk4); color: var(--pk); border-radius: 20px; padding: 3px 12px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div style="text-align:center; padding: 20px 0 4px; font-size: 18px; font-weight: 900; color: #3d1a24;">체크리스트 UI 개선 제안</div>
+<div style="text-align:center; padding: 4px 0 16px; font-size: 12px; color: #888;">좌: 현재 / 우: 개선안</div>
+
+<div class="wrapper">
+
+  <!-- ══════════════ BEFORE ══════════════ -->
+  <div>
+    <div class="col-label">⬅ 현재</div>
+    <div class="phone">
+      <div class="phone-header">
+        <span>전체 일정관리</span><small>게스트</small>
+      </div>
+      <div class="phone-body">
+        <!-- 헤더 배너 -->
+        <div class="banner">
+          <div class="banner-row">
+            <div><div class="banner-pct">63%</div><div class="banner-sub">5개 완료 · 전체 8개</div></div>
+            <div><div style="font-size:11px;color:rgba(255,255,255,.8);margin-bottom:2px">남은 항목</div><div class="banner-rem">3개</div></div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:63%"></div></div>
+        </div>
+
+        <!-- Step 5 스테이지 -->
+        <div class="card">
+          <div class="stage-header">
+            <div class="stage-title">
+              <span class="stage-step">Step 5.</span>
+              <span>신혼집 준비</span>
+              <span class="stage-badge">5/8 (63%)</span>
+            </div>
+            <span class="stage-arrow">▲</span>
+          </div>
+          <div style="padding: 0 12px 10px">
+
+            <!-- 완료된 아이템 (체크) -->
+            <div class="item-old">
+              <div class="item-old-row">
+                <input type="checkbox" checked style="width:18px;height:18px;accent-color:var(--pk);cursor:pointer;flex-shrink:0" />
+                <span class="item-old-title" style="text-decoration:line-through;color:var(--text2)">지역 선정</span>
+                <span class="label-tag label-required">필수</span>
+                <button class="info-btn">ℹ️</button>
+              </div>
+              <div class="item-old-deadline">
+                <span>목표기한</span>
+                <input class="deadline-input" value="2026-10-09" readonly />
+                <span class="dday-badge">D-155</span>
+              </div>
+            </div>
+
+            <div class="item-old">
+              <div class="item-old-row">
+                <input type="checkbox" checked style="width:18px;height:18px;accent-color:var(--pk);cursor:pointer;flex-shrink:0" />
+                <span class="item-old-title" style="text-decoration:line-through;color:var(--text2)">임장</span>
+                <span class="label-tag label-required">필수</span>
+                <button class="info-btn">ℹ️</button>
+              </div>
+              <div class="item-old-deadline">
+                <span>목표기한</span>
+                <input class="deadline-input" value="2026-10-19" readonly />
+                <span class="dday-badge">D-165</span>
+              </div>
+            </div>
+
+            <!-- 미완료 아이템 -->
+            <div class="item-old">
+              <div class="item-old-row">
+                <input type="checkbox" style="width:18px;height:18px;accent-color:var(--pk);cursor:pointer;flex-shrink:0" />
+                <span class="item-old-title">인테리어 계획</span>
+                <span class="label-tag label-optional">선택</span>
+                <button class="info-btn">ℹ️</button>
+              </div>
+              <div class="item-old-deadline">
+                <span>목표기한</span>
+                <input class="deadline-input" value="2027-02-06" readonly />
+                <span class="dday-badge">D-275</span>
+              </div>
+            </div>
+
+            <div class="item-old">
+              <div class="item-old-row">
+                <input type="checkbox" style="width:18px;height:18px;accent-color:var(--pk);cursor:pointer;flex-shrink:0" />
+                <span class="item-old-title">가전/가구 구매</span>
+                <span class="label-tag label-required">필수</span>
+                <button class="info-btn">ℹ️</button>
+              </div>
+              <div class="item-old-deadline">
+                <span>목표기한</span>
+                <input class="deadline-input" value="2027-03-08" readonly />
+                <span class="dday-badge">D-305</span>
+              </div>
+            </div>
+
+            <!-- 커스텀 -->
+            <div class="item-old">
+              <div class="item-old-row">
+                <input type="checkbox" style="width:18px;height:18px;accent-color:var(--pk);cursor:pointer;flex-shrink:0" />
+                <span class="item-old-title">sfdsfs</span>
+                <span class="label-tag label-custom">커스텀</span>
+                <button class="info-btn">🗑️</button>
+              </div>
+              <div class="item-old-deadline">
+                <span>목표기한</span>
+                <input class="deadline-input" placeholder="연도-월-일" readonly />
+              </div>
+            </div>
+
+            <!-- 항목 추가 -->
+            <div style="display:flex;gap:8px;margin-top:10px;padding-left:6px">
+              <input style="flex:1;border:1.5px solid var(--gray2);border-radius:8px;padding:8px 10px;font-size:13px;background:var(--pk5);color:var(--text2)" placeholder="항목 추가..." readonly />
+              <button style="background:var(--pk);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">추가</button>
+            </div>
+          </div>
+        </div><!-- end card -->
+
+        <!-- Step 6 -->
+        <div class="card">
+          <div class="stage-header">
+            <div class="stage-title">
+              <span class="stage-step">Step 6.</span>
+              <span>신혼여행 준비</span>
+              <span class="stage-badge">0/9 (0%)</span>
+            </div>
+            <span class="stage-arrow">▲</span>
+          </div>
+          <div style="padding:0 12px 10px">
+            <div class="item-old">
+              <div class="item-old-row">
+                <input type="checkbox" style="width:18px;height:18px;accent-color:var(--pk);cursor:pointer;flex-shrink:0" />
+                <span class="item-old-title">여행지 선정</span>
+                <span class="label-tag label-required">필수</span>
+                <button class="info-btn">ℹ️</button>
+              </div>
+              <div class="item-old-deadline">
+                <span>목표기한</span>
+                <input class="deadline-input" value="2026-12-08" readonly />
+                <span class="dday-badge">D-215</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- phone-body -->
+    </div><!-- phone -->
+  </div>
+
+  <!-- ══════════════ AFTER ══════════════ -->
+  <div>
+    <div class="col-label">개선안 ➡</div>
+    <div class="phone">
+      <div class="phone-header">
+        <span>전체 일정관리</span><small>게스트</small>
+      </div>
+      <div class="phone-body">
+        <!-- 헤더 배너 (동일 유지) -->
+        <div class="banner">
+          <div class="banner-row">
+            <div><div class="banner-pct">63%</div><div class="banner-sub">5개 완료 · 전체 8개</div></div>
+            <div><div style="font-size:11px;color:rgba(255,255,255,.8);margin-bottom:2px">남은 항목</div><div class="banner-rem">3개</div></div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:63%"></div></div>
+        </div>
+
+        <!-- Step 5 스테이지 (NEW) -->
+        <div class="card">
+          <!-- 스테이지 헤더: Step 번호 제거, 이름+진척만 -->
+          <div class="stage-header">
+            <div class="stage-title">
+              <span style="font-size:16px">🏠</span>
+              <span>신혼집 준비</span>
+              <span class="stage-badge">5/8</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;color:var(--pk);font-weight:700">63%</span>
+              <span class="stage-arrow">▲</span>
+            </div>
+          </div>
+
+          <!-- 스테이지 진행 바 -->
+          <div class="stage-prog"><div class="stage-prog-fill" style="width:63%"></div></div>
+
+          <!-- 미완료 아이템만 먼저 표시 -->
+          <div class="item-new" style="display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid var(--gray1);padding:10px 14px">
+            <div class="item-new-check"><span class="checkmark"></span></div>
+            <div class="item-new-content" style="flex:1;min-width:0">
+              <div class="item-new-title">인테리어 계획</div>
+              <div class="item-new-date">
+                <span class="date-chip">📅 2027-02-06</span>
+                <span class="dday-chip">D-275</span>
+              </div>
+            </div>
+            <button class="item-new-info">ⓘ</button>
+          </div>
+
+          <div class="item-new" style="display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid var(--gray1);padding:10px 14px">
+            <div class="item-new-check"><span class="checkmark"></span></div>
+            <div class="item-new-content" style="flex:1;min-width:0">
+              <div class="item-new-title">가전/가구 구매</div>
+              <div class="item-new-date">
+                <span class="date-chip">📅 2027-03-08</span>
+                <span class="dday-chip">D-305</span>
+              </div>
+            </div>
+            <button class="item-new-info">ⓘ</button>
+          </div>
+
+          <!-- 커스텀 아이템 (점선 구분) -->
+          <div class="item-new" style="display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid var(--gray1);padding:10px 14px;background:#fdfaff">
+            <div class="item-new-check" style="border-color:var(--mn)"><span class="checkmark"></span></div>
+            <div class="item-new-content" style="flex:1;min-width:0">
+              <div class="item-new-title">sfdsfs</div>
+              <div class="item-new-date">
+                <span class="date-chip" style="color:var(--gray3)">📅 날짜 미설정</span>
+              </div>
+            </div>
+            <button style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--pk3);flex-shrink:0;padding:0 0 0 4px;align-self:center">🗑</button>
+          </div>
+
+          <!-- 완료 항목 접기 토글 -->
+          <div class="done-toggle">
+            <span class="done-toggle-icon">▼</span>
+            <span>완료된 항목 5개 보기</span>
+          </div>
+
+          <!-- 항목 추가 -->
+          <div class="add-row">
+            <input class="add-input" placeholder="항목 추가..." readonly />
+            <button class="add-btn">+ 추가</button>
+          </div>
+        </div><!-- end card -->
+
+        <!-- Step 6 (NEW) -->
+        <div class="card">
+          <div class="stage-header">
+            <div class="stage-title">
+              <span style="font-size:16px">✈️</span>
+              <span>신혼여행 준비</span>
+              <span class="stage-badge">0/9</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;color:var(--pk);font-weight:700">0%</span>
+              <span class="stage-arrow">▼</span>
+            </div>
+          </div>
+          <!-- 접힌 상태: 진행바만 표시 -->
+          <div class="stage-prog" style="margin-bottom:12px"><div class="stage-prog-fill" style="width:0%"></div></div>
+        </div>
+
+        <!-- 개선 포인트 설명 -->
+        <div style="background:#fff;border-radius:14px;border:1.5px solid var(--pk4);padding:16px;margin-top:4px">
+          <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px">✨ 개선 포인트</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--text2);line-height:1.6">
+            <div>① <strong style="color:var(--text)">필수/선택 태그 삭제</strong> — 항목 옆 상시 노출 제거<br><span style="font-size:11px;color:var(--gray3)">→ ℹ️ 팝업에서만 확인 가능</span></div>
+            <div>② <strong style="color:var(--text)">완료 항목 접기</strong> — 체크한 항목은 "완료 N개 보기"로 숨김<br><span style="font-size:11px;color:var(--gray3)">→ 현재 할 일에만 집중 가능</span></div>
+            <div>③ <strong style="color:var(--text)">스테이지 헤더 개선</strong> — Step 번호 제거, 이모지 추가, % 수치 우측에<br><span style="font-size:11px;color:var(--gray3)">→ 스테이지 진행 바 추가</span></div>
+            <div>④ <strong style="color:var(--text)">날짜 표시 통합</strong> — "목표기한 [달력]" 2줄 → 한 줄 칩으로<br><span style="font-size:11px;color:var(--gray3)">→ D-day 뱃지도 동일 줄에 인라인</span></div>
+            <div>⑤ <strong style="color:var(--text)">ℹ️ → ⓘ</strong> — 이모지 제거, 심플한 원형 버튼으로<br><span style="font-size:11px;color:var(--gray3)">→ 시각적 노이즈 감소</span></div>
+            <div>⑥ <strong style="color:var(--text)">커스텀 항목 구분</strong> — "커스텀" 태그 대신 배경색 차이 + 보라 테두리<br><span style="font-size:11px;color:var(--gray3)">→ 태그 없이도 시각 구분</span></div>
+          </div>
+        </div>
+
+      </div><!-- phone-body -->
+    </div><!-- phone -->
+  </div>
+
+</div><!-- wrapper -->
+</body>
+</html>

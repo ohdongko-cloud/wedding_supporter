@@ -66,3 +66,9 @@ input, textarea, select {
   0%, 100% { box-shadow: 0 0 0 4px rgba(255,107,157,0.5), 0 0 0 9999px rgba(0,0,0,0.55); }
   50% { box-shadow: 0 0 0 10px rgba(255,107,157,0.1), 0 0 0 9999px rgba(0,0,0,0.55); }
 }
+
+/* 스켈레톤 shimmer */
+@keyframes skeletonShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

@@ -1,7 +1,360 @@
 import { useMemo, useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
-import type { HouseDetail, HouseDetailBuy, HouseDetailJeonse, HouseDetailRent } from '../types'
+import type { HouseDetail, HouseDetailBuy, HouseDetailJeonse, HouseDetailRent, InteriorData, InteriorProfile, InteriorCategoryItem } from '../types'
 import BannerAd from '../components/ads/BannerAd'
+
+// ── Interior Calculator ───────────────────────────────────────────────────────
+
+type BelongLevel = 'none' | 'basic' | 'full'
+type HomeCondition = 'empty' | 'partial' | 'full'
+type InteriorStyle = 'practical' | 'standard' | 'premium'
+
+interface CatDef {
+  id: string; name: string; emoji: string; required: boolean
+  costs: Record<InteriorStyle, [number, number]>   // [min, max] in 만원
+  conditionMult: Record<HomeCondition, number>      // multiplier based on home condition
+}
+
+const CAT_DEFS: CatDef[] = [
+  { id: 'floor',     name: '바닥재 (장판·마루)',    emoji: '🪵', required: true,
+    costs: { practical: [50,100],  standard: [100,200], premium: [200,400] },
+    conditionMult: { empty: 1.0, partial: 0.6, full: 0.3 } },
+  { id: 'wallpaper', name: '도배·벽지',            emoji: '🎨', required: true,
+    costs: { practical: [30,70],   standard: [70,150],  premium: [150,300] },
+    conditionMult: { empty: 1.0, partial: 0.6, full: 0.3 } },
+  { id: 'kitchen',   name: '주방 시공 (싱크대·타일)', emoji: '🍳', required: false,
+    costs: { practical: [50,120],  standard: [120,250], premium: [250,500] },
+    conditionMult: { empty: 1.0, partial: 0.7, full: 0.2 } },
+  { id: 'bathroom',  name: '욕실 시공',            emoji: '🚿', required: false,
+    costs: { practical: [50,100],  standard: [100,200], premium: [200,400] },
+    conditionMult: { empty: 1.0, partial: 0.7, full: 0.2 } },
+  { id: 'lighting',  name: '조명',                emoji: '💡', required: false,
+    costs: { practical: [20,50],   standard: [50,120],  premium: [120,300] },
+    conditionMult: { empty: 1.0, partial: 0.8, full: 0.5 } },
+  { id: 'curtain',   name: '커튼·블라인드',         emoji: '🪟', required: false,
+    costs: { practical: [20,50],   standard: [50,100],  premium: [100,200] },
+    conditionMult: { empty: 1.0, partial: 1.0, full: 1.0 } },
+  { id: 'misc',      name: '기타 (중문·타공판 등)', emoji: '📦', required: false,
+    costs: { practical: [10,30],   standard: [30,80],   premium: [80,200] },
+    conditionMult: { empty: 1.0, partial: 0.8, full: 0.5 } },
+]
+
+function buildInteriorData(profile: InteriorProfile): InteriorData {
+  const { homeCondition, interiorStyle } = profile
+  // belongings factor — more belongings = some items already owned
+  const belongFactor = (() => {
+    const scores = { none: 0, basic: 1, full: 2 }
+    return Math.min(2, scores[profile.groomBelongings] + scores[profile.brideBelongings])
+  })()
+
+  const categories: Record<string, InteriorCategoryItem[]> = {}
+  let totalMin = 0, totalMax = 0
+
+  CAT_DEFS.forEach(cat => {
+    const [baseMin, baseMax] = cat.costs[interiorStyle]
+    const mult = cat.conditionMult[homeCondition]
+    const min = Math.round(baseMin * mult)
+    const max = Math.round(baseMax * mult)
+    // Suggest "owned" for non-required items if both have full belongings
+    const suggestOwned = !cat.required && belongFactor >= 3
+    const item: InteriorCategoryItem = {
+      id: cat.id, name: `${cat.emoji} ${cat.name}`,
+      minCost: min, maxCost: max,
+      userInput: undefined, owned: suggestOwned, required: cat.required,
+    }
+    categories[cat.id] = [item]
+    if (!suggestOwned) { totalMin += min; totalMax += max }
+  })
+
+  return { profile, categories, totalMin, totalMax }
+}
+
+function makeDefaultInteriorProfile(): InteriorProfile {
+  return { groomBelongings: 'none', brideBelongings: 'none', homeCondition: 'empty', interiorStyle: 'standard' }
+}
+
+interface InteriorSectionProps {
+  interiorData: InteriorData | undefined
+  onUpdate: (data: InteriorData) => void
+}
+
+function InteriorCalculatorSection({ interiorData, onUpdate }: InteriorSectionProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [phase, setPhase] = useState<0 | 1 | 2 | 3>(interiorData ? 3 : 0)
+  const profile = interiorData?.profile ?? makeDefaultInteriorProfile()
+
+  function updateProfile(partial: Partial<InteriorProfile>) {
+    const newProfile = { ...profile, ...partial }
+    const newData = buildInteriorData(newProfile)
+    // preserve user inputs from existing data
+    if (interiorData) {
+      Object.entries(interiorData.categories).forEach(([id, items]) => {
+        if (newData.categories[id] && items[0]?.userInput !== undefined) {
+          newData.categories[id][0].userInput = items[0].userInput
+        }
+        if (newData.categories[id]) {
+          newData.categories[id][0].owned = items[0]?.owned ?? false
+        }
+      })
+      // recompute totals
+      let tMin = 0, tMax = 0
+      Object.values(newData.categories).forEach(([item]) => {
+        if (!item.owned) { tMin += item.minCost; tMax += item.maxCost }
+      })
+      newData.totalMin = tMin; newData.totalMax = tMax
+    }
+    onUpdate(newData)
+  }
+
+  function updateItem(id: string, patch: Partial<InteriorCategoryItem>) {
+    if (!interiorData) return
+    const newCats = { ...interiorData.categories }
+    newCats[id] = [{ ...newCats[id][0], ...patch }]
+    // recompute totals
+    let tMin = 0, tMax = 0, userTotal = 0
+    let hasUserInput = false
+    Object.values(newCats).forEach(([item]) => {
+      if (!item.owned) {
+        tMin += item.minCost; tMax += item.maxCost
+        if (item.userInput !== undefined) { userTotal += item.userInput; hasUserInput = true }
+      }
+    })
+    onUpdate({ ...interiorData, categories: newCats, totalMin: tMin, totalMax: tMax, userTotal: hasUserInput ? userTotal : undefined })
+  }
+
+  function finishQuestionnaire() {
+    const newData = buildInteriorData(profile)
+    onUpdate(newData)
+    setPhase(3)
+  }
+
+  const totalMin = interiorData?.totalMin ?? 0
+  const totalMax = interiorData?.totalMax ?? 0
+  const userTotal = interiorData?.userTotal
+
+  function SelectRow({ label, value, options, onChange }: {
+    label: string
+    value: string
+    options: { key: string; label: string; desc: string; emoji: string }[]
+    onChange: (v: string) => void
+  }) {
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{label}</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {options.map(o => (
+            <button key={o.key} onClick={() => onChange(o.key)} style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              padding: '10px 4px', borderRadius: 10, cursor: 'pointer', border: 'none',
+              background: value === o.key ? 'var(--pk5)' : 'var(--gray1)',
+              outline: value === o.key ? '2px solid var(--pk)' : 'none',
+              transition: 'all .15s',
+            }}>
+              <span style={{ fontSize: 18 }}>{o.emoji}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: value === o.key ? 'var(--pk)' : 'var(--text)' }}>{o.label}</span>
+              <span style={{ fontSize: 9, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.3 }}>{o.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e0e7ff', overflow: 'hidden', marginBottom: 12, boxShadow: '0 4px 20px rgba(99,102,241,.07)' }}>
+      {/* Header */}
+      <div
+        onClick={() => setIsOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer', background: '#f5f3ff', userSelect: 'none' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🛋️</span>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 800 }}>인테리어 비용 계산기</span>
+            {!interiorData && (
+              <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#d97706', borderRadius: 20, padding: '2px 8px' }}>미설정</span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {interiorData && (
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#6366f1' }}>
+              {userTotal !== undefined ? `${userTotal.toLocaleString()}만원` : `${totalMin.toLocaleString()}~${totalMax.toLocaleString()}만`}
+            </span>
+          )}
+          <span style={{ color: 'var(--text2)', fontSize: 11, transform: isOpen ? 'rotate(180deg)' : 'none', transition: '.2s' }}>▼</span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div style={{ padding: '16px' }}>
+
+          {/* ── Phase 0: 신랑·신부 짐 상태 ── */}
+          {phase === 0 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#6366f1', marginBottom: 16 }}>📦 1단계 · 보유 짐 현황</div>
+              <SelectRow
+                label="신랑 짐 상태"
+                value={profile.groomBelongings}
+                options={[
+                  { key: 'none', label: '없음', emoji: '📭', desc: '새로 구매 필요' },
+                  { key: 'basic', label: '일부', emoji: '📦', desc: '일부 보유' },
+                  { key: 'full', label: '풀세트', emoji: '🏠', desc: '가전·가구 보유' },
+                ]}
+                onChange={v => updateProfile({ groomBelongings: v as BelongLevel })}
+              />
+              <SelectRow
+                label="신부 짐 상태"
+                value={profile.brideBelongings}
+                options={[
+                  { key: 'none', label: '없음', emoji: '📭', desc: '새로 구매 필요' },
+                  { key: 'basic', label: '일부', emoji: '📦', desc: '일부 보유' },
+                  { key: 'full', label: '풀세트', emoji: '🏠', desc: '가전·가구 보유' },
+                ]}
+                onChange={v => updateProfile({ brideBelongings: v as BelongLevel })}
+              />
+              <button onClick={() => setPhase(1)} style={{
+                width: '100%', border: 'none', borderRadius: 10, padding: '12px', marginTop: 8,
+                fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#6366f1', color: '#fff',
+              }}>다음 →</button>
+            </div>
+          )}
+
+          {/* ── Phase 1: 집 컨디션 ── */}
+          {phase === 1 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#6366f1', marginBottom: 16 }}>🏗️ 2단계 · 집 컨디션</div>
+              <SelectRow
+                label="현재 집 상태"
+                value={profile.homeCondition}
+                options={[
+                  { key: 'empty', label: '빈집', emoji: '🏚️', desc: '전체 시공 필요' },
+                  { key: 'partial', label: '일부 시공', emoji: '🏠', desc: '부분 손질 필요' },
+                  { key: 'full', label: '풀시공', emoji: '✨', desc: '마감 상태 양호' },
+                ]}
+                onChange={v => updateProfile({ homeCondition: v as HomeCondition })}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setPhase(0)} style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 10, padding: '12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', background: '#fff', color: 'var(--text2)' }}>← 이전</button>
+                <button onClick={() => setPhase(2)} style={{ flex: 2, border: 'none', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#6366f1', color: '#fff' }}>다음 →</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Phase 2: 인테리어 스타일 ── */}
+          {phase === 2 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#6366f1', marginBottom: 16 }}>🎨 3단계 · 인테리어 스타일</div>
+              <SelectRow
+                label="원하는 인테리어 수준"
+                value={profile.interiorStyle}
+                options={[
+                  { key: 'practical', label: '실용형', emoji: '💚', desc: '합리적 가격\n기능 중심' },
+                  { key: 'standard', label: '스탠다드', emoji: '💛', desc: '평균 수준\n깔끔한 마감' },
+                  { key: 'premium', label: '프리미엄', emoji: '❤️', desc: '고급 자재\n완성도 집중' },
+                ]}
+                onChange={v => updateProfile({ interiorStyle: v as InteriorStyle })}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setPhase(1)} style={{ flex: 1, border: '1.5px solid var(--gray2)', borderRadius: 10, padding: '12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', background: '#fff', color: 'var(--text2)' }}>← 이전</button>
+                <button onClick={finishQuestionnaire} style={{ flex: 2, border: 'none', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#6366f1', color: '#fff' }}>견적 보기 ✨</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Phase 3: 결과 & 항목별 입력 ── */}
+          {phase === 3 && interiorData && (
+            <div>
+              {/* 요약 뱃지 */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+                {[
+                  { label: `신랑 짐: ${profile.groomBelongings === 'none' ? '없음' : profile.groomBelongings === 'basic' ? '일부' : '풀세트'}` },
+                  { label: `신부 짐: ${profile.brideBelongings === 'none' ? '없음' : profile.brideBelongings === 'basic' ? '일부' : '풀세트'}` },
+                  { label: `집 상태: ${profile.homeCondition === 'empty' ? '빈집' : profile.homeCondition === 'partial' ? '일부시공' : '풀시공'}` },
+                  { label: `스타일: ${profile.interiorStyle === 'practical' ? '실용형' : profile.interiorStyle === 'standard' ? '스탠다드' : '프리미엄'}` },
+                ].map(b => (
+                  <span key={b.label} style={{ fontSize: 10, fontWeight: 700, background: '#ede9fe', color: '#6366f1', borderRadius: 20, padding: '3px 10px' }}>{b.label}</span>
+                ))}
+                <button onClick={() => setPhase(0)} style={{ fontSize: 10, fontWeight: 700, background: 'none', border: '1px solid var(--gray2)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', color: 'var(--text2)' }}>다시 설정</button>
+              </div>
+
+              {/* 합계 */}
+              <div style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 12, padding: '12px 16px', color: '#fff', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, opacity: .8, marginBottom: 4 }}>예상 인테리어 비용</div>
+                <div style={{ fontSize: 22, fontWeight: 900 }}>
+                  {userTotal !== undefined ? `${userTotal.toLocaleString()}만원` : `${totalMin.toLocaleString()}~${totalMax.toLocaleString()}만원`}
+                </div>
+                <div style={{ fontSize: 10, opacity: .7, marginTop: 3 }}>
+                  {userTotal !== undefined ? '직접 입력 합계' : '예상 범위 (실제와 다를 수 있어요)'}
+                </div>
+              </div>
+
+              {/* 항목별 테이블 */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>항목을 직접 수정하거나 보유 여부를 체크해요</div>
+                {CAT_DEFS.map(cat => {
+                  const item = interiorData.categories[cat.id]?.[0]
+                  if (!item) return null
+                  return (
+                    <div key={cat.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '9px 0',
+                      borderBottom: '1px solid var(--gray1)', opacity: item.owned ? .45 : 1,
+                    }}>
+                      {/* 보유 체크박스 */}
+                      <div
+                        onClick={() => updateItem(cat.id, { owned: !item.owned })}
+                        style={{
+                          width: 18, height: 18, borderRadius: 4, flexShrink: 0, cursor: 'pointer',
+                          border: `2px solid ${item.owned ? '#6366f1' : 'var(--gray2)'}`,
+                          background: item.owned ? '#6366f1' : '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        {item.owned && <span style={{ color: '#fff', fontSize: 10, fontWeight: 900 }}>✓</span>}
+                      </div>
+
+                      {/* 항목명 */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textDecoration: item.owned ? 'line-through' : 'none' }}>{cat.name}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 1 }}>
+                          {item.owned ? '보유 (비용 제외)' : `예상 ${item.minCost.toLocaleString()}~${item.maxCost.toLocaleString()}만원`}
+                        </div>
+                      </div>
+
+                      {/* 직접 입력 */}
+                      {!item.owned && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                          <input
+                            type="number"
+                            value={item.userInput ?? ''}
+                            onChange={e => updateItem(cat.id, { userInput: e.target.value ? Number(e.target.value) : undefined })}
+                            placeholder={item.minCost.toLocaleString()}
+                            style={{
+                              width: 58, border: '1.5px solid #e0e7ff', borderRadius: 6,
+                              padding: '3px 5px', fontSize: 12, textAlign: 'right', outline: 'none',
+                              background: item.userInput !== undefined ? '#ede9fe' : '#f9f9f9',
+                              color: item.userInput !== undefined ? '#6366f1' : 'var(--text2)',
+                              fontWeight: item.userInput !== undefined ? 700 : 400,
+                            }}
+                          />
+                          <span style={{ fontSize: 10, color: 'var(--text2)' }}>만</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4, lineHeight: 1.6 }}>
+                💡 체크박스 = 보유/불필요한 항목 | 금액란 = 견적 직접 입력
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -983,12 +1336,6 @@ export default function HouseCalculatorPage() {
   }
 
   const mode = houseDetail.mode
-  const tabs: { key: HouseDetail['mode']; label: string }[] = [
-    { key: 'buy', label: '매매' },
-    { key: 'jeonse', label: '전세' },
-    { key: 'rent', label: '월세' },
-  ]
-
   const timelineSteps = mode === 'buy' ? BUY_STEPS : mode === 'jeonse' ? JEONSE_STEPS : RENT_STEPS
 
   const budget = userData.calcHouse.budget || 0
@@ -999,56 +1346,346 @@ export default function HouseCalculatorPage() {
     setUserData({ ...userData, calcHouse: { ...userData.calcHouse, budget: val } })
   }
 
+  // ── 거주형태별 기본값 프리셋
+  const HOUSE_MODE_PRESETS = {
+    rent:   { region: '서울 마포구 합정동', deposit: '3000',  monthly: '80'  },
+    jeonse: { region: '경기도 성남시 분당구', price: '25000' },
+    buy:    { region: '경기도 수원시 영통구', price: '40000', loanCondition: '신혼부부특례' as const },
+  }
+
+  // 거주형태 변경 + 비어있을 경우 기본값 적용
+  function switchMode(key: HouseDetail['mode']) {
+    const next = { ...houseDetail, mode: key }
+    if (key === 'rent' && !next.rent.deposit && !next.rent.monthly) {
+      next.rent = { ...next.rent, ...HOUSE_MODE_PRESETS.rent }
+    }
+    if (key === 'jeonse' && !next.jeonse.price) {
+      next.jeonse = { ...next.jeonse, ...HOUSE_MODE_PRESETS.jeonse }
+    }
+    if (key === 'buy' && !next.buy.price) {
+      next.buy = { ...next.buy, ...HOUSE_MODE_PRESETS.buy }
+    }
+    update(next)
+  }
+
+  // 히어로 카드용 핵심 수치 계산
+  const heroBuy = (() => {
+    const p = num(houseDetail.buy.price)
+    if (!p) return null
+    const tax = Math.round(p * acquisitionTaxRate(p))
+    const fee = Math.round(buyAgentFee(p))
+    const reg = houseDetail.buy.region ? getRegulation(houseDetail.buy.region) : null
+    const condDef = LOAN_CONDITIONS.find(c => c.key === (houseDetail.buy.loanCondition ?? '일반')) ?? LOAN_CONDITIONS[0]
+    const effectiveLtv = reg ? Math.min(reg.ltvPct + condDef.ltvBonusPct, condDef.maxLtvPct) : 50
+    const ltvRaw = Math.round(p * effectiveLtv / 100)
+    const actualLoan = condDef.loanCapMan > 0 ? Math.min(ltvRaw, condDef.loanCapMan) : ltvRaw
+    const loanRate = num(houseDetail.buy.loanRate) || 4.5
+    const loanYears = num(houseDetail.buy.loanYears) || 30
+    const loanMonthly = actualLoan > 0
+      ? Math.round(monthlyPayment(actualLoan * 10000, loanRate, loanYears, houseDetail.buy.repaymentMethod) / 10000)
+      : 0
+    return { price: p, tax, fee, needCash: p - actualLoan + tax + fee, actualLoan, loanMonthly }
+  })()
+  const heroJeonse = (() => {
+    const p = num(houseDetail.jeonse.price)
+    if (!p) return null
+    const fee = Math.round(jeonseAgentFee(p))
+    const loan = Math.round(p * 0.8)
+    const loanRate = num(houseDetail.jeonse.loanRate) || 3.5
+    const monthlyInterest = loan > 0 ? Math.round(loan * loanRate / 100 / 12) : 0
+    return { price: p, fee, loan, needCash: p - loan + fee, monthlyInterest }
+  })()
+  const heroRent = (() => {
+    const dep = num(houseDetail.rent.deposit)
+    const mon = num(houseDetail.rent.monthly)
+    if (!dep && !mon) return null
+    return { deposit: dep, monthly: mon, annual: mon * 12 }
+  })()
+
+  // ── 단계 자동 감지 ──────────────────────────────────────────────────────────
+  const houseStep = (() => {
+    const d = houseDetail
+    // Step 1: 거주형태 선택 — 항상 완료 (앱에 들어온 것 자체)
+    // Step 2: 재정현황 파악 — 금액 + 현금 입력 여부
+    const hasPriceInput = mode === 'buy'
+      ? !!num(d.buy.price)
+      : mode === 'jeonse'
+        ? !!num(d.jeonse.price)
+        : !!(num(d.rent.deposit) || num(d.rent.monthly))
+    const hasCashInput = mode === 'buy'
+      ? !!(num(d.buy.cashGroom) || num(d.buy.cashBride))
+      : mode === 'jeonse'
+        ? !!(num(d.jeonse.cashGroom) || num(d.jeonse.cashBride))
+        : !!(num(d.rent.cashGroom) || num(d.rent.cashBride))
+    const step2Done = hasPriceInput && hasCashInput
+    // Step 3: 대출 전략 — 소득 입력 여부 (매매), 금리 입력 여부 (전세), 월세는 불필요
+    const step3Done = mode === 'buy'
+      ? !!(num(d.buy.incomeGroom) || num(d.buy.incomeBride))
+      : mode === 'jeonse'
+        ? !!num(d.jeonse.loanRate)
+        : true
+    // Step 4: 매물탐색 — address 입력 여부
+    const step4Done = !!(d.address && d.address.trim())
+    // Step 5: 계약체결 — targetMoveIn 입력 여부
+    const step5Done = !!d.targetMoveIn
+
+    if (!step2Done) return 2
+    if (!step3Done) return 3
+    if (!step4Done) return 4
+    if (!step5Done) return 5
+    return 6 // 모두 완료
+  })()
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px 32px' }}>
-      {/* Budget goal — buy / jeonse only */}
-      {mode !== 'rent' && (
-        <div style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', borderRadius: 14, padding: '16px 20px', color: '#fff', marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, opacity: .85, marginBottom: 8 }}>
-            🏠 목표 예산 ({mode === 'buy' ? '매매가' : '전세가'} 기준)
-          </div>
-          <input
-            type="number"
-            value={budget || ''}
-            onChange={e => updateBudget(parseInt(e.target.value) || 0)}
-            placeholder="목표 예산 입력 (만원)"
-            style={{ width: '100%', border: 'none', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', outline: 'none', color: '#333' }}
-          />
-          {budget > 0 && currentPrice > 0 && budgetDiff !== null && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              {[
-                { label: '목표 예산', val: fmtWon(budget), warn: false },
-                { label: mode === 'buy' ? '매매가' : '전세가', val: fmtWon(currentPrice), warn: false },
-                { label: '여유 / 부족', val: budgetDiff >= 0 ? `+${fmtWon(budgetDiff)}` : `${fmtWon(Math.abs(budgetDiff))} 부족`, warn: budgetDiff < 0 },
-              ].map(({ label, val, warn }) => (
-                <div key={label} style={{ flex: 1, background: 'rgba(255,255,255,.15)', borderRadius: 8, padding: '8px 6px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, opacity: .8, marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: warn ? '#fecaca' : '#fff' }}>{val}</div>
+      {/* ── 거주 형태 선택 (pill chips) ── */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 6 }}>
+          🏠 거주 형태 · 자동 예시값 세팅
+        </div>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
+          {([
+            { key: 'rent'   as const, emoji: '🏠', label: '월세', sub: '보증금+월세', color: '#f97316' },
+            { key: 'jeonse' as const, emoji: '🔑', label: '전세', sub: '전세금 기준',  color: '#3b82f6' },
+            { key: 'buy'    as const, emoji: '🏡', label: '매매', sub: '매매가 기준',  color: '#22c55e' },
+          ] as const).map(({ key, emoji, label, sub, color }) => {
+            const active = mode === key
+            return (
+              <button key={key} onClick={() => switchMode(key)} style={{
+                flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 100, cursor: 'pointer',
+                border: `1.5px solid ${active ? color : 'var(--gray2)'}`,
+                background: active ? color : '#fff',
+                color: active ? '#fff' : 'var(--text)',
+                boxShadow: active ? `0 3px 10px ${color}55` : '0 1px 4px rgba(0,0,0,.06)',
+                transition: 'all .15s',
+              }}>
+                <span style={{ fontSize: 16 }}>{emoji}</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap' }}>{label}</div>
+                  <div style={{ fontSize: 9, opacity: active ? .85 : .55, whiteSpace: 'nowrap' }}>{sub}</div>
                 </div>
-              ))}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── 예산 히어로 카드 ── */}
+      <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', borderRadius: 14, padding: '16px', color: '#fff', marginBottom: 12, boxShadow: '0 6px 24px rgba(255,107,157,.25)' }}>
+        {/* 거주형태 배지 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <span style={{ background: 'rgba(255,255,255,.22)', border: '1px solid rgba(255,255,255,.4)', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 800 }}>
+            {mode === 'buy' ? '🏡 매매' : mode === 'jeonse' ? '🔑 전세' : '🏠 월세'}
+          </span>
+        </div>
+
+        {/* 메인 수치 + 잔여 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, opacity: .8, fontWeight: 600, marginBottom: 2 }}>
+              {mode === 'buy' ? '🏡 목표 매매가' : mode === 'jeonse' ? '🔑 목표 전세가' : '🏠 월 주거비'}
+            </div>
+            <div style={{ fontSize: 'clamp(22px,6vw,28px)', fontWeight: 900, lineHeight: 1 }}>
+              {mode === 'rent'
+                ? (heroRent ? `${fmtWon(heroRent.monthly)}/월` : '미입력')
+                : (currentPrice > 0 ? fmtWon(currentPrice) : '미입력')}
+            </div>
+            {mode !== 'rent' && budget > 0 && (
+              <div style={{ fontSize: 11, opacity: .75, marginTop: 4 }}>목표 예산 {fmtWon(budget)} 기준</div>
+            )}
+          </div>
+          {mode !== 'rent' && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, opacity: .8, marginBottom: 2 }}>예산 여유</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: budgetDiff !== null && budgetDiff < 0 ? '#ffd0d0' : '#a8ffdf' }}>
+                {budgetDiff !== null
+                  ? (budgetDiff >= 0 ? `+${fmtWon(budgetDiff)}` : `-${fmtWon(Math.abs(budgetDiff))}`)
+                  : '-'}
+              </div>
             </div>
           )}
         </div>
-      )}
 
-      {/* Tab buttons */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => update({ ...houseDetail, mode: t.key })}
-            style={{
-              flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 14, fontWeight: 700,
-              border: '1.5px solid var(--pk4)', cursor: 'pointer',
-              background: mode === t.key ? 'var(--pk)' : '#fff',
-              color: mode === t.key ? '#fff' : 'var(--pk)',
-              transition: 'all .15s',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+        {/* 핵심 수치 요약 미니 카드 */}
+        {mode === 'buy' && heroBuy && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 10 }}>
+            {[
+              { label: '취득세', val: fmtWon(heroBuy.tax), highlight: false },
+              { label: '중개수수료', val: fmtWon(heroBuy.fee), highlight: false },
+              { label: '예상 대출', val: heroBuy.actualLoan > 0 ? fmtWon(heroBuy.actualLoan) : '-', highlight: true },
+              { label: '월 상환액', val: heroBuy.loanMonthly > 0 ? `${fmt(heroBuy.loanMonthly)}/월` : '-', highlight: true },
+            ].map(({ label, val, highlight }) => (
+              <div key={label} style={{ background: highlight ? 'rgba(255,255,100,.18)' : 'rgba(255,255,255,.15)', borderRadius: 8, padding: '6px 4px', textAlign: 'center', border: highlight ? '1px solid rgba(255,255,100,.35)' : 'none' }}>
+                <div style={{ fontSize: 9, color: highlight ? '#ffe86e' : 'rgba(255,255,255,.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, color: highlight ? '#ffe86e' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {mode === 'jeonse' && heroJeonse && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 10 }}>
+            {[
+              { label: '전세대출 (80%)', val: fmtWon(heroJeonse.loan), highlight: false },
+              { label: '중개수수료', val: fmtWon(heroJeonse.fee), highlight: false },
+              { label: '예상 대출', val: fmtWon(heroJeonse.loan), highlight: true },
+              { label: '월 이자', val: heroJeonse.monthlyInterest > 0 ? `${fmt(heroJeonse.monthlyInterest)}/월` : '-', highlight: true },
+            ].map(({ label, val, highlight }) => (
+              <div key={label} style={{ background: highlight ? 'rgba(255,255,100,.18)' : 'rgba(255,255,255,.15)', borderRadius: 8, padding: '6px 4px', textAlign: 'center', border: highlight ? '1px solid rgba(255,255,100,.35)' : 'none' }}>
+                <div style={{ fontSize: 9, color: highlight ? '#ffe86e' : 'rgba(255,255,255,.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, color: highlight ? '#ffe86e' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {mode === 'rent' && heroRent && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {[
+              { label: '보증금', val: fmtWon(heroRent.deposit) },
+              { label: '월세', val: `${fmt(heroRent.monthly)}/월` },
+              { label: '연 주거비', val: fmtWon(heroRent.annual) },
+            ].map(({ label, val }) => (
+              <div key={label} style={{ flex: 1, background: 'rgba(255,255,255,.15)', borderRadius: 8, padding: '6px 4px', textAlign: 'center', minWidth: 0 }}>
+                <div style={{ fontSize: 9, opacity: .8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+                <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 목표 예산 입력 (월세 제외) */}
+        {mode !== 'rent' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.15)', borderRadius: 9, padding: '7px 12px' }}>
+            <span style={{ fontSize: 11, opacity: .85, whiteSpace: 'nowrap', flexShrink: 0 }}>목표 예산</span>
+            <input
+              type="number"
+              value={budget || ''}
+              onChange={e => updateBudget(parseInt(e.target.value) || 0)}
+              placeholder="미설정"
+              style={{ flex: 1, border: 'none', background: 'transparent', color: '#fff', fontSize: 14, fontWeight: 700, outline: 'none', textAlign: 'right', minWidth: 0 }}
+            />
+            <span style={{ fontSize: 11, opacity: .7, flexShrink: 0 }}>만원</span>
+          </div>
+        )}
       </div>
+
+      {/* ── 단계별 준비 가이드 ── */}
+      {(() => {
+        const steps = [
+          { n: 1, title: '거주 형태 결정', desc: mode === 'buy' ? '매매 선택 완료' : mode === 'jeonse' ? '전세 선택 완료' : '월세 선택 완료' },
+          { n: 2, title: '재정 현황 파악', desc: '금액 · 보유현금 입력' },
+          { n: 3, title: '대출 전략 수립', desc: mode === 'buy' ? '소득 입력 · 대출조건 설정' : mode === 'jeonse' ? '금리 설정 완료' : '해당 없음' },
+          { n: 4, title: '매물 탐색', desc: '아파트명 / 주소 입력' },
+          { n: 5, title: '계약 체결', desc: '입주 목표일 설정' },
+        ]
+        const totalDone = Math.min(houseStep - 1, 5)
+        const pct = Math.round((totalDone / 5) * 100)
+        return (
+          <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid var(--pk4)', overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{ background: 'var(--pk5)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 800 }}>🗺️ 신혼집 준비 단계</span>
+              <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 600 }}>{totalDone}/5 단계 완료</span>
+            </div>
+            <div style={{ height: 4, background: 'var(--gray1)', margin: '0 16px' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--pk)', borderRadius: 2, transition: 'width .5s' }} />
+            </div>
+            <div style={{ padding: '8px 16px 12px' }}>
+              {steps.map(s => {
+                const isDone = s.n < houseStep
+                const isActive = s.n === houseStep && houseStep <= 5
+                return (
+                  <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: s.n < 5 ? '1px solid var(--gray1)' : 'none' }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                      background: isDone ? 'var(--pk)' : isActive ? 'var(--pk)' : 'var(--pk4)',
+                      color: isDone || isActive ? '#fff' : 'var(--pk)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 11, fontWeight: 800,
+                      boxShadow: isActive ? '0 0 8px rgba(255,107,157,.4)' : 'none',
+                    }}>
+                      {isDone ? '✓' : s.n}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: isDone ? 'var(--text2)' : 'var(--text)' }}>{s.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{s.desc}</div>
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                      background: isDone ? '#dcfce7' : isActive ? 'var(--pk4)' : 'var(--gray1)',
+                      color: isDone ? '#16a34a' : isActive ? 'var(--pk)' : 'var(--text2)' }}>
+                      {isDone ? '완료' : isActive ? '진행 중' : '예정'}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── 지금 할 일 팁 카드 ── */}
+      {(() => {
+        const tips: Record<number, { title: string; items: string[] }> = {
+          2: {
+            title: `💡 지금 이걸 해보세요 — ${mode === 'buy' ? '재정 현황' : '재정 현황'} 단계`,
+            items: [
+              `목표 ${mode === 'buy' ? '매매가' : mode === 'jeonse' ? '전세가' : '보증금+월세'}를 입력해주세요`,
+              '보유 현금 (신랑+신부 합산)을 입력하면 부족/여유 현금이 계산돼요',
+              '월 저축액을 입력하면 계약 시점까지 추가 저축 금액도 반영돼요',
+            ],
+          },
+          3: {
+            title: mode === 'buy'
+              ? '💡 지금 이걸 해보세요 — 대출 전략 단계'
+              : '💡 지금 이걸 해보세요 — 전세대출 금리 확인',
+            items: mode === 'buy' ? [
+              '연소득(신랑+신부)을 입력하면 DSR 기준 대출 한도가 계산돼요',
+              '신혼부부특례 (금리 1.85~3.0%) · 디딤돌 · 보금자리론 요건 확인하기',
+              '주거래은행 대출 상담 예약 (금리 비교 필수)',
+            ] : [
+              '전세자금대출 금리 (현재 기준 약 3.0~4.0%)를 입력해주세요',
+              '신혼부부 특례 대출 최대 3억, 금리 우대 가능 여부 확인',
+              '주택도시보증공사(HUG) 전세보증보험 가입도 함께 검토해보세요',
+            ],
+          },
+          4: {
+            title: '💡 지금 이걸 해보세요 — 매물 탐색 단계',
+            items: [
+              '아파트명 / 주소를 입력하면 규제지역 LTV가 자동으로 적용돼요',
+              '현지 임장: 교통편·학군·편의시설·소음 직접 확인',
+              '네이버 부동산·호갱노노에서 실거래가 트렌드 확인하기',
+            ],
+          },
+          5: {
+            title: '💡 지금 이걸 해보세요 — 계약 체결 준비',
+            items: [
+              '입주 목표일을 설정하면 준비 타임라인이 표시돼요',
+              '계약 전 등기부등본 확인 필수 (선순위 근저당 체크)',
+              '계약금 → 중도금 → 잔금 일정 확인 후 자금 계획 확정',
+            ],
+          },
+          6: {
+            title: '✅ 모든 단계 완료! 최종 점검',
+            items: [
+              '대출 승인 → 잔금 납부 → 소유권 이전 등기 순서로 진행',
+              '이사 후 14일 이내 전입신고 + 확정일자 필수',
+              '취득세는 취득일 기준 60일 이내 납부',
+            ],
+          },
+        }
+        const tip = tips[Math.min(houseStep, 6)]
+        if (!tip) return null
+        return (
+          <div style={{ background: 'linear-gradient(135deg, #fff5f9, #f0f0ff)', border: '1.5px solid var(--pk4)', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--pk)', marginBottom: 8 }}>{tip.title}</div>
+            {tip.items.map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4, fontSize: 12, color: '#444', lineHeight: 1.5 }}>
+                <span style={{ flexShrink: 0, opacity: .6 }}>•</span>{item}
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Common header section */}
       <CollapsibleCard title="기본 정보">
@@ -1106,6 +1743,15 @@ export default function HouseCalculatorPage() {
           onChange={rent => update({ ...houseDetail, rent })}
         />
       )}
+
+      {/* ── 인테리어 비용 계산기 ── */}
+      <InteriorCalculatorSection
+        interiorData={userData.interiorData}
+        onUpdate={data => {
+          setUserData({ ...userData, interiorData: data })
+          saveUserData()
+        }}
+      />
 
       {/* 배너 광고 — 페이지 최하단 */}
       <BannerAd />

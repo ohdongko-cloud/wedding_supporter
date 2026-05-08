@@ -65,9 +65,14 @@ export interface HouseDetail {
   jeonse: HouseDetailJeonse
   rent: HouseDetailRent
 }
+export type HoneymoonCategory = 'flight' | 'hotel' | 'food' | 'activity' | 'snap' | 'shopping' | 'etc'
+export interface HoneymoonBookingItem {
+  id: string; label: string; memo: string; done: boolean
+}
 export interface HoneymoonScheduleItem {
   id: string; time: string; reserved: boolean; title: string
   detail: string; amount: number; note: string
+  category?: HoneymoonCategory
 }
 export interface HoneymoonDay {
   id: string; dayNumber: number; date: string; isOpen: boolean
@@ -76,7 +81,27 @@ export interface HoneymoonDay {
 export interface HoneymoonPlanState {
   budget: number
   days: HoneymoonDay[]
+  destination?: string
+  departureDate?: string
+  returnDate?: string
+  bookingChecklist?: HoneymoonBookingItem[]
 }
+export interface InteriorProfile {
+  groomBelongings: 'none' | 'basic' | 'full'
+  brideBelongings: 'none' | 'basic' | 'full'
+  homeCondition: 'empty' | 'partial' | 'full'
+  interiorStyle: 'practical' | 'standard' | 'premium'
+}
+export interface InteriorCategoryItem {
+  id: string; name: string; minCost: number; maxCost: number
+  userInput?: number; owned: boolean; required: boolean
+}
+export interface InteriorData {
+  profile: InteriorProfile
+  categories: Record<string, InteriorCategoryItem[]>
+  totalMin: number; totalMax: number; userTotal?: number
+}
+
 export interface UserData {
   nick: string; pinHash: string; pinHint?: string; weddingDate: string; totalBudget: number; venueName: string
   checklist: Record<string, ChecklistStageState>
@@ -86,6 +111,10 @@ export interface UserData {
   honeymoonPlan?: HoneymoonPlanState
   hasSeenTour?: boolean
   hasSeenOnboarding?: boolean
+  weddingStyle?: 'simple' | 'basic' | 'luxury'
+  honeymoonType?: 'simple' | 'basic' | 'luxury'
+  housingType?: 'buy' | 'jeonse' | 'rent'
+  interiorData?: InteriorData
 }
 export interface SharedSnapshot {
   share_token: string

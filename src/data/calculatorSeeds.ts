@@ -265,14 +265,42 @@ const WEDDING_SEEDS: Record<string, WeddingSeedItem[]> = {
 export const CALC_SEEDS: Record<string, Record<string, any[][]>> = {
   wedding: WEDDING_SEEDS as Record<string, any[][]>,
   honeymoon: {
-    flight:        [['h_flight', '항공권 (2인)', 200]],
-    accommodation: [['h_hotel',  '숙소',         200]],
-    food:          [['h_food',   '식비',          50]],
-    transport:     [['h_trans',  '현지 교통',     30]],
-    activity:      [['h_act',    '액티비티',      50]],
-    shopping:      [['h_shop',   '쇼핑',          50]],
-    insurance:     [['h_ins',    '여행자보험',    15]],
-    etc:           [['h_etc',    '기타 비용',     30]],
+    // 4박5일 기준 세부 항목
+    flight: [
+      ['h_flight',   '항공권 (2인, 왕복)',     150],
+      ['h_airtax',   '공항세·유류할증료',       15],
+      ['h_transfer', '공항↔숙소 이동',           8],
+    ],
+    accommodation: [
+      ['h_hotel',   '숙소 (4박)',              150],
+      ['h_upgrade', '룸 업그레이드',             30],
+    ],
+    food: [
+      ['h_breakfast', '조식 (4일)',              15],
+      ['h_lunch',     '점심식비 (5일)',           20],
+      ['h_dinner',    '저녁·특별 디너',           35],
+      ['h_snack',     '카페·간식',               10],
+    ],
+    transport: [
+      ['h_trans', '현지 교통',                  20],
+      ['h_sim',   '유심·포켓 와이파이',           3],
+    ],
+    activity: [
+      ['h_act',   '주요 액티비티',              40],
+      ['h_photo', '현지 스냅 촬영',             30],
+    ],
+    shopping: [
+      ['h_shop',     '쇼핑',                   50],
+      ['h_souvenir', '기념품',                  10],
+    ],
+    insurance: [
+      ['h_ins', '여행자 보험',                  10],
+    ],
+    etc: [
+      ['h_visa', '비자·여행 서류',               5],
+      ['h_tip',  '팁·서비스 비용',               5],
+      ['h_etc',  '기타 비용',                   10],
+    ],
   },
   house: {
     deposit:   [['ho_dep',    '보증금/매매자금',  20000]],

@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UI 개선 프리뷰</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Apple SD Gothic Neo', sans-serif; background: #f5f5f8; color: #222; }
+  :root {
+    --pk: #ff6b9d; --pk4: #fde8f0; --pk5: #fff5f9;
+    --mn: #c77dff; --bl: #4dabf7;
+    --gray1: #f0f0f3; --gray2: #d0d0d8; --text2: #888;
+    --gr: #22c55e;
+  }
+  .page { max-width: 390px; margin: 0 auto; background: #f5f5f8; padding: 16px 16px 80px; }
+  .section-label { font-size: 22px; font-weight: 900; color: #333; padding: 24px 0 10px; border-bottom: 3px solid var(--pk); margin-bottom: 16px; }
+  .sub-label { font-size: 13px; font-weight: 700; color: var(--text2); padding: 4px 8px; background: #fff; border-radius: 6px; display: inline-block; margin-bottom: 8px; }
+  .note { font-size: 11px; color: #aaa; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 14px; border: 1.5px solid var(--pk4); padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 12px rgba(255,107,157,.08); }
+  /* --- HERO gradient --- */
+  .hero { background: linear-gradient(135deg, #ff6b9d, #c77dff); border-radius: 14px; padding: 16px; color: #fff; margin-bottom: 12px; box-shadow: 0 6px 24px rgba(255,107,157,.25); }
+  .badge { background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.4); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 800; display: inline-block; margin-bottom: 8px; }
+  .hero-big { font-size: 28px; font-weight: 900; line-height: 1; }
+  .hero-sub { font-size: 10px; opacity: .8; margin-bottom: 2px; }
+  .mini-chips { display: flex; gap: 6px; margin-bottom: 10px; }
+  .mini-chip { flex: 1; background: rgba(255,255,255,.15); border-radius: 8px; padding: 6px 4px; text-align: center; min-width: 0; }
+  .mini-chip-label { font-size: 9px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-chip-val { font-size: 11px; font-weight: 800; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-chip.NEW .mini-chip-label { color: #ffe86e; }
+  .mini-chip.NEW .mini-chip-val { color: #ffe86e; }
+  .progress-bar { height: 6px; background: rgba(255,255,255,.25); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+  .progress-fill { height: 100%; background: #fff; border-radius: 3px; }
+  /* --- pill chips --- */
+  .pills { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 10px; }
+  .pill { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 100px; cursor: pointer; border: 1.5px solid #d0d0d8; background: #fff; color: #333; }
+  .pill.active { color: #fff; }
+  .pill-name { font-size: 11px; font-weight: 800; }
+  .pill-sub { font-size: 9px; opacity: .55; }
+  .pill.active .pill-sub { opacity: .85; }
+  /* --- step guide --- */
+  .step-guide { background: #fff; border-radius: 14px; border: 1.5px solid var(--pk4); overflow: hidden; margin-bottom: 12px; }
+  .step-guide-header { background: var(--pk5); padding: 12px 16px; font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .step-list { padding: 12px 16px; }
+  .step-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gray1); }
+  .step-item:last-child { border-bottom: none; }
+  .step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--pk4); color: var(--pk); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-num.done { background: var(--pk); color: #fff; }
+  .step-num.active { background: var(--pk); color: #fff; box-shadow: 0 0 8px rgba(255,107,157,.4); }
+  .step-info { flex: 1; }
+  .step-title { font-size: 13px; font-weight: 700; }
+  .step-desc { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .step-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .tag-done { background: #dcfce7; color: #16a34a; }
+  .tag-now { background: #fde8f0; color: var(--pk); }
+  .tag-todo { background: var(--gray1); color: var(--text2); }
+  /* --- tip card --- */
+  .tip-card { background: linear-gradient(135deg, #fff5f9, #f0f0ff); border: 1.5px solid var(--pk4); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .tip-card-title { font-size: 12px; font-weight: 800; color: var(--pk); margin-bottom: 6px; }
+  .tip-item { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; font-size: 12px; color: #444; line-height: 1.5; }
+  /* --- booking checklist --- */
+  .booking-list { display: flex; flex-direction: column; gap: 6px; }
+  .booking-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #fff; border-radius: 10px; border: 1.5px solid var(--gray1); }
+  .booking-item.done { border-color: #dcfce7; background: #f0fff4; }
+  .chk { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--gray2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .chk.done { background: var(--gr); border-color: var(--gr); color: #fff; }
+  .booking-label { flex: 1; font-size: 13px; font-weight: 600; }
+  .booking-sub { font-size: 10px; color: var(--text2); margin-top: 1px; }
+  .booking-status { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
+  .status-done { background: #dcfce7; color: #16a34a; }
+  .status-todo { background: var(--gray1); color: var(--text2); }
+  /* --- destination card --- */
+  .dest-card { background: #fff; border-radius: 12px; border: 1.5px solid var(--pk4); padding: 14px; margin-bottom: 12px; }
+  .dest-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .dest-icon { font-size: 18px; flex-shrink: 0; }
+  .dest-input { flex: 1; border: 1.5px solid var(--pk4); border-radius: 8px; padding: 7px 10px; font-size: 13px; outline: none; }
+  .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .date-box { background: var(--pk5); border-radius: 10px; padding: 8px 12px; text-align: center; border: 1.5px solid var(--pk4); }
+  .date-box-label { font-size: 10px; color: var(--text2); font-weight: 700; margin-bottom: 2px; }
+  .date-box-val { font-size: 13px; font-weight: 800; color: var(--pk); }
+  .dday-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--pk); color: #fff; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 800; margin-top: 8px; }
+  /* --- budget breakdown --- */
+  .budget-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .budget-cat-label { font-size: 11px; font-weight: 700; width: 52px; flex-shrink: 0; }
+  .budget-bar-bg { flex: 1; height: 8px; background: var(--gray1); border-radius: 4px; overflow: hidden; }
+  .budget-bar-fill { height: 100%; border-radius: 4px; }
+  .budget-amt { font-size: 11px; font-weight: 700; width: 44px; text-align: right; color: var(--text2); flex-shrink: 0; }
+  /* --- sum row --- */
+  .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--gray1); font-size: 12px; }
+  .sum-row:last-child { border-bottom: none; }
+  .sum-label { color: var(--text2); }
+  .sum-val { font-weight: 600; color: #333; }
+  .sum-val.big { font-size: 18px; font-weight: 800; color: var(--pk); }
+  .sum-val.green { font-size: 16px; font-weight: 800; color: #22c55e; }
+  .sum-val.red { font-size: 16px; font-weight: 800; color: #e03060; }
+  .sum-val.highlight { font-weight: 800; color: #4dabf7; }
+  /* --- nav tabs (preview label) --- */
+  .section-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; margin-top: 8px; }
+  .nav-btn { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; border: 2px solid var(--pk); background: var(--pk); color: #fff; }
+  .nav-btn.outline { background: #fff; color: var(--pk); }
+  /* --- schedule card view --- */
+  .sched-card { background: #fff; border-radius: 10px; border: 1.5px solid var(--pk4); padding: 10px 12px; margin-bottom: 6px; display: flex; gap: 10px; align-items: flex-start; }
+  .sched-time { font-size: 11px; font-weight: 700; color: var(--pk); width: 40px; flex-shrink: 0; padding-top: 2px; }
+  .sched-body { flex: 1; min-width: 0; }
+  .sched-title { font-size: 13px; font-weight: 700; }
+  .sched-detail { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .sched-amt { font-size: 12px; font-weight: 800; color: var(--pk); white-space: nowrap; }
+  .sched-reserved { background: #f0fff4; border-color: #86efac; }
+  .sched-reserved .sched-title { text-decoration: line-through; color: var(--text2); }
+  .sched-chk { width: 18px; height: 18px; border-radius: 50%; background: #dcfce7; border: none; color: #16a34a; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  /* --- dashboard additions --- */
+  .status-strip { display: flex; gap: 8px; margin-bottom: 12px; }
+  .status-card { flex: 1; background: #fff; border-radius: 12px; border: 1.5px solid var(--pk4); padding: 10px 10px; }
+  .status-card-icon { font-size: 18px; margin-bottom: 4px; }
+  .status-card-title { font-size: 10px; color: var(--text2); font-weight: 700; margin-bottom: 3px; }
+  .status-card-val { font-size: 14px; font-weight: 800; color: #333; }
+  .status-card-sub { font-size: 9px; color: var(--pk); font-weight: 700; margin-top: 2px; }
+  .next-action-card { background: linear-gradient(135deg, #fff5f9, #f5f0ff); border: 1.5px solid var(--pk4); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .next-action-title { font-size: 12px; font-weight: 800; color: #888; margin-bottom: 8px; }
+  .next-action-item { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(255,107,157,.1); }
+  .next-action-item:last-child { border-bottom: none; }
+  .next-action-icon { font-size: 16px; flex-shrink: 0; }
+  .next-action-text { flex: 1; font-size: 12px; font-weight: 600; color: #333; }
+  .next-action-btn { font-size: 10px; font-weight: 700; color: var(--pk); background: var(--pk4); border: none; border-radius: 8px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+  /* sections */
+  .divider { height: 2px; background: linear-gradient(to right, var(--pk), var(--mn)); border-radius: 1px; margin: 32px 0 16px; }
+  h2 { font-size: 18px; font-weight: 900; margin-bottom: 4px; }
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .ba-col { background: #fff; border-radius: 10px; padding: 10px; border: 1.5px solid #ddd; }
+  .ba-col.after { border-color: var(--pk); background: var(--pk5); }
+  .ba-title { font-size: 10px; font-weight: 800; color: #999; margin-bottom: 6px; }
+  .ba-title.after { color: var(--pk); }
+  .collapsible { background: #fff; border-radius: 12px; border: 1.5px solid var(--pk4); overflow: hidden; margin-bottom: 8px; }
+  .coll-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--pk5); font-size: 13px; font-weight: 800; }
+  .tag-new { background: var(--pk); color: #fff; font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 10px; margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ========== TITLE ========== -->
+  <div style="text-align:center; padding: 20px 0 10px;">
+    <div style="font-size:28px; font-weight:900; color: #ff6b9d;">💒 UI 개선 프리뷰</div>
+    <div style="font-size:13px; color:#888; margin-top:4px;">변경 예정 내용 시각화 · 확인 후 반영 진행</div>
+  </div>
+
+  <div class="section-nav">
+    <a href="#house" class="nav-btn">🏡 신혼집</a>
+    <a href="#honeymoon" class="nav-btn">✈️ 신혼여행</a>
+    <a href="#dashboard" class="nav-btn">📊 요약</a>
+  </div>
+
+  <!-- =========================================================
+       SECTION 1 · 신혼집
+  ========================================================= -->
+  <div id="house" class="divider"></div>
+  <h2>🏡 신혼집 계산기</h2>
+  <div class="note">① 히어로 카드에 예상대출·월상환 추가 &nbsp;② 단계별 가이드 카드 신설 &nbsp;③ 지금 할 일 팁 카드</div>
+
+  <!-- 1-A: 거주형태 pill chips (기존 유지) -->
+  <div class="sub-label">거주 형태 선택 (기존 유지)</div>
+  <div class="pills" style="margin-bottom:12px;">
+    <div class="pill" style="border-color:#f97316; background:#f97316; color:#fff;">
+      <span style="font-size:16px;">🏠</span>
+      <div><div class="pill-name">월세</div><div class="pill-sub" style="opacity:.85">보증금+월세</div></div>
+    </div>
+    <div class="pill" style="border-color:#3b82f6; background:#3b82f6; color:#fff;">
+      <span style="font-size:16px;">🔑</span>
+      <div><div class="pill-name">전세</div><div class="pill-sub" style="opacity:.85">전세금 기준</div></div>
+    </div>
+    <div class="pill" style="border-color:#22c55e; background:#22c55e; color:#fff;">
+      <span style="font-size:16px;">🏡</span>
+      <div><div class="pill-name">매매</div><div class="pill-sub" style="opacity:.85">매매가 기준</div></div>
+    </div>
+  </div>
+
+  <!-- 1-B: 히어로 카드 (매매 모드) - 기존 vs 신규 비교 -->
+  <div class="sub-label">히어로 카드 · 매매 모드</div>
+  <div class="before-after" style="align-items:start;">
+    <div class="ba-col">
+      <div class="ba-title">BEFORE (현재)</div>
+      <div style="background:linear-gradient(135deg,#ff6b9d,#c77dff);border-radius:10px;padding:12px;color:#fff;font-size:10px;">
+        <div style="margin-bottom:6px;font-size:9px;opacity:.8;">🏡 매매</div>
+        <div style="font-size:18px;font-weight:900;margin-bottom:8px;">4억원</div>
+        <div style="display:flex;gap:4px;">
+          <div style="flex:1;background:rgba(255,255,255,.15);border-radius:6px;padding:5px 3px;text-align:center;">
+            <div style="font-size:8px;opacity:.8;">취득세</div>
+            <div style="font-size:10px;font-weight:800;">440만</div>
+          </div>
+          <div style="flex:1;background:rgba(255,255,255,.15);border-radius:6px;padding:5px 3px;text-align:center;">
+            <div style="font-size:8px;opacity:.8;">중개수수료</div>
+            <div style="font-size:10px;font-weight:800;">160만</div>
+          </div>
+          <div style="flex:1;background:rgba(255,255,255,.15);border-radius:6px;padding:5px 3px;text-align:center;">
+            <div style="font-size:8px;opacity:.8;">예상필요현금</div>
+            <div style="font-size:10px;font-weight:800;">2.06억</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-title after">AFTER ✨ (변경)</div>
+      <div style="background:linear-gradient(135deg,#ff6b9d,#c77dff);border-radius:10px;padding:12px;color:#fff;font-size:10px;">
+        <div style="margin-bottom:6px;font-size:9px;opacity:.8;">🏡 매매</div>
+        <div style="font-size:18px;font-weight:900;margin-bottom:8px;">4억원</div>
+        <div style="display:flex;gap:4px;margin-bottom:4px;">
+          <div style="flex:1;background:rgba(255,255,255,.15);border-radius:6px;padding:5px 3px;text-align:center;">
+            <div style="font-size:8px;opacity:.8;">취득세</div>
+            <div style="font-size:10px;font-weight:800;">440만</div>
+          </div>
+          <div style="flex:1;background:rgba(255,255,255,.15);border-radius:6px;padding:5px 3px;text-align:center;">
+            <div style="font-size:8px;opacity:.8;">중개수수료</div>
+            <div style="font-size:10px;font-weight:800;">160만</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <div style="flex:1;background:rgba(255,255,100,.2);border-radius:6px;padding:5px 3px;text-align:center;border:1px solid rgba(255,255,100,.4);">
+            <div style="font-size:8px;color:#ffe86e;">🆕 예상대출</div>
+            <div style="font-size:10px;font-weight:800;color:#ffe86e;">2억원</div>
+          </div>
+          <div style="flex:1;background:rgba(255,255,100,.2);border-radius:6px;padding:5px 3px;text-align:center;border:1px solid rgba(255,255,100,.4);">
+            <div style="font-size:8px;color:#ffe86e;">🆕 월상환액</div>
+            <div style="font-size:10px;font-weight:800;color:#ffe86e;">95만/월</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 전세 모드 히어로 카드 AFTER -->
+  <div class="sub-label">히어로 카드 · 전세 모드 (변경 후)</div>
+  <div class="hero" style="margin-bottom:12px;">
+    <div class="badge">🔑 전세</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;opacity:.8;margin-bottom:2px;">🔑 목표 전세가</div>
+        <div class="hero-big">2.5억원</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:9px;opacity:.8;margin-bottom:2px;">예산 여유</div>
+        <div style="font-size:16px;font-weight:800;color:#a8ffdf;">+500만</div>
+      </div>
+    </div>
+    <div class="mini-chips">
+      <div class="mini-chip">
+        <div class="mini-chip-label">전세대출(80%)</div>
+        <div class="mini-chip-val">2억원</div>
+      </div>
+      <div class="mini-chip">
+        <div class="mini-chip-label">중개수수료</div>
+        <div class="mini-chip-val">75만</div>
+      </div>
+      <div class="mini-chip NEW" style="background:rgba(255,255,100,.2);border:1px solid rgba(255,255,100,.3);">
+        <div class="mini-chip-label">🆕 예상대출</div>
+        <div class="mini-chip-val">2억원</div>
+      </div>
+      <div class="mini-chip NEW" style="background:rgba(255,255,100,.2);border:1px solid rgba(255,255,100,.3);">
+        <div class="mini-chip-label">🆕 월이자</div>
+        <div class="mini-chip-val">58만/월</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.15);border-radius:9px;padding:7px 12px;">
+      <span style="font-size:11px;opacity:.85;">목표 예산</span>
+      <span style="flex:1;text-align:right;font-size:14px;font-weight:700;">25,500만원</span>
+      <span style="font-size:11px;opacity:.7;">만원</span>
+    </div>
+  </div>
+
+  <!-- 1-C: 단계별 준비 가이드 카드 (NEW) -->
+  <div class="sub-label">🆕 단계별 준비 가이드 카드</div>
+  <div class="step-guide" style="margin-bottom:12px;">
+    <div class="step-guide-header">
+      🗺️ 신혼집 준비 단계 <span style="font-size:10px;color:var(--text2);font-weight:600;margin-left:auto;">3/5 단계 진행 중</span>
+    </div>
+    <div style="height:4px;background:var(--gray1);margin:0 16px 4px;">
+      <div style="height:100%;width:60%;background:var(--pk);border-radius:2px;"></div>
+    </div>
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-num done">✓</div>
+        <div class="step-info">
+          <div class="step-title">거주 형태 결정</div>
+          <div class="step-desc">전세 선택 완료</div>
+        </div>
+        <div class="step-tag tag-done">완료</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num done">✓</div>
+        <div class="step-info">
+          <div class="step-title">재정 현황 파악</div>
+          <div class="step-desc">보유현금·소득 입력 완료</div>
+        </div>
+        <div class="step-tag tag-done">완료</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num active">3</div>
+        <div class="step-info">
+          <div class="step-title">대출 전략 세우기</div>
+          <div class="step-desc">신혼부부 특례 검토 중</div>
+        </div>
+        <div class="step-tag tag-now">진행 중</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-info">
+          <div class="step-title">지역·매물 탐색</div>
+          <div class="step-desc">타깃 지역 임장 필요</div>
+        </div>
+        <div class="step-tag tag-todo">예정</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">5</div>
+        <div class="step-info">
+          <div class="step-title">계약 체결</div>
+          <div class="step-desc">입주 목표일 기준 역산</div>
+        </div>
+        <div class="step-tag tag-todo">예정</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1-D: 지금 할 일 팁 카드 (NEW) -->
+  <div class="sub-label">🆕 지금 할 일 팁 카드 (상태 기반 동적 표시)</div>
+  <div class="tip-card">
+    <div class="tip-card-title">💡 지금 이걸 해보세요 — 대출 전략 단계</div>
+    <div class="tip-item">✅ 신혼부부특례 대출 금리 1.85~3.0% — 소득 기준 확인하기</div>
+    <div class="tip-item">📞 주거래은행 대출 상담 예약 (거주지역 지점 기준)</div>
+    <div class="tip-item">📋 필요 서류 미리 준비: 혼인신고서, 건강보험료 납부확인서</div>
+  </div>
+
+  <!-- =========================================================
+       SECTION 2 · 신혼여행
+  ========================================================= -->
+  <div id="honeymoon" class="divider"></div>
+  <h2>✈️ 신혼여행 계획</h2>
+  <div class="note">① 여행지·날짜 카드 신설 &nbsp;② 예약 체크리스트 &nbsp;③ 예산 카테고리 분배 &nbsp;④ 일정 카드 뷰 (테이블 대체 옵션)</div>
+
+  <!-- 여행 유형 pill (기존 유지) -->
+  <div class="sub-label">여행 유형 선택 (기존 유지)</div>
+  <div class="pills" style="margin-bottom:12px;">
+    <div class="pill" style="border-color:var(--pk);background:var(--pk);color:#fff;">
+      <span>🌴</span>
+      <div><div class="pill-name">동남아</div><div class="pill-sub" style="opacity:.85">약 450만</div></div>
+    </div>
+    <div class="pill"><span>🏝️</span><div><div class="pill-name">국내·제주</div><div class="pill-sub">약 200만</div></div></div>
+    <div class="pill"><span>🗼</span><div><div class="pill-name">하와이·유럽</div><div class="pill-sub">약 1,000만</div></div></div>
+  </div>
+
+  <!-- 2-A: 여행지·날짜 카드 (NEW) -->
+  <div class="sub-label">🆕 여행지 · 출발 날짜 카드</div>
+  <div class="dest-card" style="margin-bottom:12px;">
+    <div class="dest-row">
+      <div class="dest-icon">✈️</div>
+      <input class="dest-input" value="발리 · 꾸따 비치" readonly />
+    </div>
+    <div class="date-row">
+      <div class="date-box">
+        <div class="date-box-label">출발일</div>
+        <div class="date-box-val">2026. 10. 12</div>
+      </div>
+      <div class="date-box">
+        <div class="date-box-label">귀국일</div>
+        <div class="date-box-val">2026. 10. 17</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+      <div class="dday-chip">✈️ D-157</div>
+      <div style="font-size:11px;color:var(--text2);">5박 6일 · 결혼식 다음날 출발</div>
+    </div>
+  </div>
+
+  <!-- 2-B: 히어로 카드 (변경 후) -->
+  <div class="sub-label">히어로 카드 (기존 유지 + DAY 요약)</div>
+  <div class="hero" style="margin-bottom:12px;">
+    <div class="badge">🌴 동남아 4박5일</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;opacity:.8;margin-bottom:2px;">✈️ 신혼여행 예상 합계</div>
+        <div class="hero-big">450만원</div>
+        <div style="font-size:10px;opacity:.75;margin-top:4px;">목표 예산 450만원 기준</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:9px;opacity:.8;margin-bottom:2px;">예산 잔여</div>
+        <div style="font-size:16px;font-weight:800;color:#a8ffdf;">±0만</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:100%;"></div></div>
+    <div class="mini-chips">
+      <div class="mini-chip"><div class="mini-chip-label">DAY 1</div><div class="mini-chip-val">124만</div></div>
+      <div class="mini-chip"><div class="mini-chip-label">DAY 2</div><div class="mini-chip-val">46만</div></div>
+      <div class="mini-chip"><div class="mini-chip-label">DAY 3</div><div class="mini-chip-val">82만</div></div>
+      <div class="mini-chip"><div class="mini-chip-label">DAY 4</div><div class="mini-chip-val">89만</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.15);border-radius:9px;padding:7px 12px;">
+      <span style="font-size:11px;opacity:.85;">목표 예산</span>
+      <span style="flex:1;text-align:right;font-size:14px;font-weight:700;">4,500,000</span>
+      <span style="font-size:11px;opacity:.7;">원</span>
+      <button style="background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;">저장</button>
+    </div>
+  </div>
+
+  <!-- 2-C: 카테고리별 예산 배분 (NEW) -->
+  <div class="sub-label">🆕 카테고리별 예산 배분</div>
+  <div class="card" style="margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:800;margin-bottom:10px;">💸 지출 카테고리 분석</div>
+    <div class="budget-row">
+      <div class="budget-cat-label">✈️ 항공</div>
+      <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:27%;background:#4dabf7;"></div></div>
+      <div class="budget-amt">118만</div>
+    </div>
+    <div class="budget-row">
+      <div class="budget-cat-label">🏨 숙박</div>
+      <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:33%;background:#c77dff;"></div></div>
+      <div class="budget-amt">150만</div>
+    </div>
+    <div class="budget-row">
+      <div class="budget-cat-label">📸 스냅</div>
+      <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:6%;background:#ff6b9d;"></div></div>
+      <div class="budget-amt">25만</div>
+    </div>
+    <div class="budget-row">
+      <div class="budget-cat-label">🍽️ 식비</div>
+      <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:8%;background:#f59e0b;"></div></div>
+      <div class="budget-amt">36만</div>
+    </div>
+    <div class="budget-row">
+      <div class="budget-cat-label">🏄 액티비티</div>
+      <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:8%;background:#22c55e;"></div></div>
+      <div class="budget-amt">33만</div>
+    </div>
+    <div class="budget-row">
+      <div class="budget-cat-label">🛍️ 쇼핑</div>
+      <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:13%;background:#f97316;"></div></div>
+      <div class="budget-amt">56만</div>
+    </div>
+    <div style="height:1px;background:var(--gray1);margin:8px 0;"></div>
+    <div class="budget-row" style="margin-bottom:0;">
+      <div class="budget-cat-label" style="font-weight:800;color:#333;">합계</div>
+      <div style="flex:1;"></div>
+      <div class="budget-amt" style="font-weight:800;color:var(--pk);font-size:13px;">418만</div>
+    </div>
+  </div>
+
+  <!-- 2-D: 예약 체크리스트 (NEW) -->
+  <div class="sub-label">🆕 예약·준비 체크리스트</div>
+  <div class="card" style="margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:800;margin-bottom:10px;">📋 출발 전 필수 체크</div>
+    <div class="booking-list">
+      <div class="booking-item done">
+        <div class="chk done">✓</div>
+        <div class="booking-body">
+          <div class="booking-label">✈️ 항공권 예약</div>
+          <div class="booking-sub">인천↔발리 왕복 | 편명: KE628</div>
+        </div>
+        <div class="booking-status status-done">완료</div>
+      </div>
+      <div class="booking-item done">
+        <div class="chk done">✓</div>
+        <div class="booking-body">
+          <div class="booking-label">🏨 숙소 예약</div>
+          <div class="booking-sub">Four Seasons Bali | 4박</div>
+        </div>
+        <div class="booking-status status-done">완료</div>
+      </div>
+      <div class="booking-item">
+        <div class="chk"></div>
+        <div class="booking-body">
+          <div class="booking-label">🛡️ 여행자 보험</div>
+          <div class="booking-sub">출발 전까지 가입 필요</div>
+        </div>
+        <div class="booking-status status-todo">미완료</div>
+      </div>
+      <div class="booking-item">
+        <div class="chk"></div>
+        <div class="booking-body">
+          <div class="booking-label">💱 환전</div>
+          <div class="booking-sub">USD 300 / IDR 2,000,000 예정</div>
+        </div>
+        <div class="booking-status status-todo">미완료</div>
+      </div>
+      <div class="booking-item">
+        <div class="chk"></div>
+        <div class="booking-body">
+          <div class="booking-label">📶 유심/포켓와이파이</div>
+          <div class="booking-sub">인도네시아 현지 유심 구매</div>
+        </div>
+        <div class="booking-status status-todo">미완료</div>
+      </div>
+      <div class="booking-item">
+        <div class="chk"></div>
+        <div class="booking-body">
+          <div class="booking-label">📸 현지 스냅 작가 예약</div>
+          <div class="booking-sub">DAY3 오전 6시 예약 필요</div>
+        </div>
+        <div class="booking-status status-todo">미완료</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2-E: 일정 카드 뷰 (NEW - 테이블 대체 옵션) -->
+  <div class="sub-label">🆕 일정 카드 뷰 (기존 테이블 대체 옵션)</div>
+  <div class="card" style="margin-bottom:8px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:14px;font-weight:800;color:var(--pk);">DAY 1 · 출발</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:12px;color:var(--text2);">2026.10.12</span>
+        <span style="font-size:12px;font-weight:700;color:var(--pk);">소계 124만</span>
+      </div>
+    </div>
+    <div class="sched-card sched-reserved">
+      <div class="sched-time">09:00</div>
+      <div class="sched-body">
+        <div class="sched-title">국제선 항공 (2인, 왕복)</div>
+        <div class="sched-detail">이코노미 · 발리/다낭/방콕</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+        <div class="sched-amt">100만원</div>
+        <div class="sched-chk">✓</div>
+      </div>
+    </div>
+    <div class="sched-card">
+      <div class="sched-time">14:00</div>
+      <div class="sched-body">
+        <div class="sched-title">공항→호텔 이동</div>
+        <div class="sched-detail">셔틀·그랩</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+        <div class="sched-amt">7만원</div>
+        <div class="chk" style="width:18px;height:18px;font-size:10px;"></div>
+      </div>
+    </div>
+    <div class="sched-card">
+      <div class="sched-time">17:00</div>
+      <div class="sched-body">
+        <div class="sched-title">호텔 체크인</div>
+        <div class="sched-detail">5성급 리조트 (1박)</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+        <div class="sched-amt">30만원</div>
+        <div class="chk" style="width:18px;height:18px;font-size:10px;"></div>
+      </div>
+    </div>
+    <button style="width:100%;background:var(--pk5);border:1.5px dashed var(--pk4);color:var(--pk);border-radius:8px;padding:7px 0;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px;">+ 일정 추가</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;">
+    <button style="flex:1;background:var(--pk);color:#fff;border:none;border-radius:8px;padding:7px 0;font-size:11px;font-weight:700;cursor:pointer;">📋 카드 뷰 (NEW)</button>
+    <button style="flex:1;background:#fff;color:var(--text2);border:1.5px solid var(--gray2);border-radius:8px;padding:7px 0;font-size:11px;font-weight:700;cursor:pointer;">📊 테이블 뷰 (기존)</button>
+  </div>
+
+  <!-- =========================================================
+       SECTION 3 · 요약 대시보드
+  ========================================================= -->
+  <div id="dashboard" class="divider"></div>
+  <h2>📊 요약 대시보드</h2>
+  <div class="note">① 신혼여행·신혼집 상태 요약 카드 추가 &nbsp;② 다음 할 일 제안 카드</div>
+
+  <!-- 기존 히어로 카드 (유지) -->
+  <div class="sub-label">기존 히어로 카드 (D-Day · 예산) 유지</div>
+  <div class="hero" style="margin-bottom:12px;padding:14px;">
+    <div style="font-size:17px;font-weight:900;margin-bottom:4px;">💒 예비부부님의 결혼식</div>
+    <div style="font-size:11px;opacity:.8;margin-bottom:10px;font-style:italic;">절반 이상 왔어요! 잘 하고 있어요 ✨</div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;">
+      <div style="font-size:26px;font-weight:900;">D-157</div>
+      <div style="font-size:11px;opacity:.8;">2026-10-11 (일요일)<br/><span>💕 우리의 특별한 날</span></div>
+    </div>
+    <div style="display:flex;gap:5px;margin-bottom:8px;">
+      <div style="flex:1;background:rgba(255,255,255,.18);border-radius:10px;padding:7px 4px;text-align:center;">
+        <div style="font-size:14px;font-weight:900;">58%</div>
+        <div style="font-size:9px;opacity:.82;">✅ 준비 완료</div>
+      </div>
+      <div style="flex:1;background:rgba(255,255,255,.18);border-radius:10px;padding:7px 4px;text-align:center;">
+        <div style="font-size:14px;font-weight:900;">1,320만</div>
+        <div style="font-size:9px;opacity:.82;">💰 예상 비용</div>
+      </div>
+      <div style="flex:1;background:rgba(255,255,255,.18);border-radius:10px;padding:7px 4px;text-align:center;">
+        <div style="font-size:14px;font-weight:900;color:#a8ffdf;">+180만</div>
+        <div style="font-size:9px;opacity:.82;">예산 여유</div>
+      </div>
+    </div>
+    <div style="height:4px;background:rgba(255,255,255,.25);border-radius:2px;">
+      <div style="height:100%;width:58%;background:#fff;border-radius:2px;"></div>
+    </div>
+  </div>
+
+  <!-- 3-A: 신혼여행·신혼집 상태 카드 (NEW) -->
+  <div class="sub-label">🆕 신혼여행 · 신혼집 상태 요약</div>
+  <div class="status-strip" style="margin-bottom:12px;">
+    <div class="status-card">
+      <div class="status-card-icon">✈️</div>
+      <div class="status-card-title">신혼여행</div>
+      <div class="status-card-val">450만</div>
+      <div style="height:3px;background:var(--gray1);border-radius:2px;margin:4px 0 2px;">
+        <div style="height:100%;width:100%;background:var(--mn);border-radius:2px;"></div>
+      </div>
+      <div class="status-card-sub">예약 2/6 완료</div>
+    </div>
+    <div class="status-card">
+      <div class="status-card-icon">🏡</div>
+      <div class="status-card-title">신혼집 (전세)</div>
+      <div class="status-card-val">2.5억</div>
+      <div style="height:3px;background:var(--gray1);border-radius:2px;margin:4px 0 2px;">
+        <div style="height:100%;width:60%;background:var(--bl);border-radius:2px;"></div>
+      </div>
+      <div class="status-card-sub">단계 3/5 · 대출 검토 중</div>
+    </div>
+  </div>
+
+  <!-- 3-B: 다음 할 일 제안 카드 (NEW) -->
+  <div class="sub-label">🆕 다음 할 일 제안 카드</div>
+  <div class="next-action-card" style="margin-bottom:12px;">
+    <div class="next-action-title">🎯 지금 바로 하면 좋은 것들</div>
+    <div class="next-action-item">
+      <div class="next-action-icon">✈️</div>
+      <div>
+        <div class="next-action-text">신혼여행 여행자 보험 미가입</div>
+        <div style="font-size:10px;color:var(--text2);">출발 D-157 · 미리 가입하면 저렴해요</div>
+      </div>
+      <button class="next-action-btn">가입하기 →</button>
+    </div>
+    <div class="next-action-item">
+      <div class="next-action-icon">🏡</div>
+      <div>
+        <div class="next-action-text">신혼부부 특례 대출 상담 예약</div>
+        <div style="font-size:10px;color:var(--text2);">현재 단계 3 · 대출 전략 수립 필요</div>
+      </div>
+      <button class="next-action-btn">바로가기 →</button>
+    </div>
+    <div class="next-action-item">
+      <div class="next-action-icon">📋</div>
+      <div>
+        <div class="next-action-text">체크리스트 7개 항목 기한 임박</div>
+        <div style="font-size:10px;color:var(--text2);">이번 주 안에 처리 필요</div>
+      </div>
+      <button class="next-action-btn">확인하기 →</button>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       SUMMARY 변경 사항 목록
+  ========================================================= -->
+  <div class="divider"></div>
+  <h2>📝 변경 사항 요약</h2>
+  <div style="margin-top:12px;">
+    <div class="collapsible" style="margin-bottom:8px;">
+      <div class="coll-header">🏡 신혼집 계산기 <span class="tag-new">4가지 변경</span></div>
+      <div style="padding:12px 14px;font-size:12px;line-height:2;color:#444;">
+        <b>①</b> 히어로 카드에 <b style="color:var(--pk)">예상대출액 + 월상환액(이자)</b> 칩 추가 (매매·전세·월세 각각)<br/>
+        <b>②</b> 단계별 준비 가이드 카드 (5단계 진행상황 시각화)<br/>
+        <b>③</b> 지금 할 일 팁 카드 (현재 단계 기반 동적 제안)<br/>
+        <b>④</b> 입력 완성도 기반 단계 자동 감지 (지역·금액·소득 입력 여부)
+      </div>
+    </div>
+    <div class="collapsible" style="margin-bottom:8px;">
+      <div class="coll-header">✈️ 신혼여행 계획 <span class="tag-new">4가지 변경</span></div>
+      <div style="padding:12px 14px;font-size:12px;line-height:2;color:#444;">
+        <b>①</b> <b style="color:var(--pk)">여행지 · 출발·귀국일 입력 카드</b> + D-Day 카운트다운<br/>
+        <b>②</b> 카테고리별 예산 배분 분석 카드 (항공/숙박/식비/액티비티/쇼핑)<br/>
+        <b>③</b> 예약·준비 체크리스트 카드 (6개 핵심 항목)<br/>
+        <b>④</b> 일정 <b style="color:var(--pk)">카드 뷰 / 테이블 뷰 전환</b> 기능 (모바일 편의성)
+      </div>
+    </div>
+    <div class="collapsible" style="margin-bottom:8px;">
+      <div class="coll-header">📊 요약 대시보드 <span class="tag-new">2가지 추가</span></div>
+      <div style="padding:12px 14px;font-size:12px;line-height:2;color:#444;">
+        <b>①</b> 신혼여행·신혼집 <b style="color:var(--pk)">상태 요약 카드</b> (비용 + 진행률 미니 바)<br/>
+        <b>②</b> <b style="color:var(--pk)">다음 할 일 제안 카드</b> (미완료 항목 기반 동적 표시)
+      </div>
+    </div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,var(--pk),var(--mn));border-radius:14px;padding:16px;color:#fff;text-align:center;margin-top:20px;">
+    <div style="font-size:16px;font-weight:900;margin-bottom:6px;">✅ 이 내용으로 진행할까요?</div>
+    <div style="font-size:12px;opacity:.9;line-height:1.7;">위 프리뷰를 확인 후<br/>Claude에게 "반영해줘" 라고 말씀해주세요</div>
+  </div>
+
+</div>
+</body>
+</html>

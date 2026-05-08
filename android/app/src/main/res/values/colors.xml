@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#FF6B9D</color>
+    <color name="colorPrimaryDark">#C77DFF</color>
+    <color name="colorAccent">#C77DFF</color>
+    <!-- 스플래시 배경색 (핑크-퍼플 중간) -->
+    <color name="splashBackground">#E05AC0</color>
+</resources>

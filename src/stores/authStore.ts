@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react'
 import type { AuthUser, UserData } from '../types'
 import { StorageService, userKey } from '../services/storage'
 import { CHECKLIST_STAGES } from '../data/checklistSeed'
+import { CALC_SEEDS } from '../data/calculatorSeeds'
 import { supabase } from '../services/supabaseClient'
 
 export function hashPin(pin: string): string {
@@ -84,6 +85,74 @@ export function buildDefaultUserData(nick: string, pinHash: string, pinHint?: st
   }
 }
 
+/** 게스트 모드 전용: 서울 외곽 2030 중산층 아래 기준 기본값 */
+function buildGuestUserData(): UserData {
+  const base = buildDefaultUserData('게스트', '')
+
+  // ── 결혼식: 하객 150명, 식대 6.6만/인, 대관료 200万 ──────────────
+  base.calcWedding.budget    = 2800
+  base.calcWedding.mealCount = 150
+  base.calcWedding.mealPrice = 66000
+  base.calcWedding.venueDirect = 200
+
+  // ── 신혼여행: 동남아(다낭·발리) 4박5일 기준 ─────────────────────
+  // 항목 세부화 — ID는 calculatorSeeds honeymoon 참조
+  const hVals: Record<string, string> = {
+    h_flight: '90',  h_airtax: '10',  h_transfer: '7',   // 항공권
+    h_hotel: '110',  h_upgrade: '0',                      // 숙소 4박
+    h_breakfast: '0', h_lunch: '15', h_dinner: '25', h_snack: '8', // 식비
+    h_trans: '15',   h_sim: '3',                           // 교통
+    h_act: '30',     h_photo: '20',                        // 액티비티
+    h_shop: '35',    h_souvenir: '8',                      // 쇼핑
+    h_ins: '10',                                           // 보험
+    h_visa: '0',     h_tip: '5',    h_etc: '8',            // 기타
+  }
+  const hChk: Record<string, boolean> = {
+    h_flight: true,  h_airtax: true,  h_transfer: true,
+    h_hotel: true,   h_upgrade: false,
+    h_breakfast: false, h_lunch: true, h_dinner: true, h_snack: true,
+    h_trans: true,   h_sim: true,
+    h_act: true,     h_photo: true,
+    h_shop: true,    h_souvenir: true,
+    h_ins: true,
+    h_visa: false,   h_tip: true,   h_etc: true,
+  }
+  const newHCats = { ...base.calcHoneymoon.cats }
+  Object.entries(CALC_SEEDS.honeymoon).forEach(([catKey, seeds]) => {
+    newHCats[catKey] = {
+      customItems: [],
+      defItems: (seeds as any[]).map(s => ({
+        id: s[0], name: s[1], avg: s[2], deleted: false,
+        customVal: hVals[s[0]] ?? '',
+        checked:   hChk[s[0]] !== false,
+      })),
+    }
+  })
+  let hTotal = 0
+  Object.values(newHCats).forEach(cat => cat.defItems.forEach(it => { if (it.checked) hTotal += it.customVal ? Number(it.customVal) || 0 : it.avg }))
+  base.calcHoneymoon = { ...base.calcHoneymoon, budget: 390, cats: newHCats, totalCost: hTotal }
+
+  // ── 신혼집: 서울 외곽 월세, 보증금 5,000万 기준 ──────────────────
+  const houVals: Record<string, string>  = { ho_dep: '5000', ho_loan: '0', ho_agent: '50', ho_move: '100', ho_fridge: '100', ho_washer: '80', ho_tv: '80', ho_ac: '80', ho_bed: '100', ho_sofa: '80', ho_table: '40', ho_desk: '30', ho_int: '0', ho_sup: '30', ho_etc: '0' }
+  const houChk: Record<string, boolean>  = { ho_dep: true, ho_loan: false, ho_agent: true, ho_move: true, ho_fridge: true, ho_washer: true, ho_tv: true, ho_ac: true, ho_bed: true, ho_sofa: true, ho_table: true, ho_desk: true, ho_int: false, ho_sup: true, ho_etc: false }
+  const newHouCats = { ...base.calcHouse.cats }
+  Object.entries(CALC_SEEDS.house).forEach(([catKey, seeds]) => {
+    newHouCats[catKey] = {
+      customItems: [],
+      defItems: (seeds as any[]).map(s => ({
+        id: s[0], name: s[1], avg: s[2], deleted: false,
+        customVal: houVals[s[0]] ?? '',
+        checked:   houChk[s[0]] !== false,
+      })),
+    }
+  })
+  let houTotal = 0
+  Object.values(newHouCats).forEach(cat => cat.defItems.forEach(it => { if (it.checked) houTotal += it.customVal ? Number(it.customVal) || 0 : it.avg }))
+  base.calcHouse = { ...base.calcHouse, budget: 6800, cats: newHouCats, totalCost: houTotal }
+
+  return base
+}
+
 async function pushToCloud(nick: string, pinHash: string, data: UserData, updatedAt: string) {
   if (!supabase) return
   await supabase.from('users').upsert({ nick: nick.toLowerCase(), pin_hash: pinHash, data, updated_at: updatedAt })
@@ -143,7 +212,7 @@ function loadAuthLocal(): { nick: string; ph: string } | null {
 // 앱 시작 시 로컬 저장 인증 복구
 const _saved = loadAuthLocal()
 let _initUser: AuthUser = { nick: '게스트', pinHash: '' }
-let _initUserData: UserData = buildDefaultUserData('게스트', '')
+let _initUserData: UserData = buildGuestUserData()
 if (_saved) {
   const _localData = StorageService.get<UserData>(userKey(_saved.nick))
   if (_localData && _localData.pinHash === _saved.ph) {
@@ -235,13 +304,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginAnon() {
     clearAuthLocal()
     Sentry.setUser({ username: '게스트' })
-    set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
+    set({ user: { nick: '게스트', pinHash: '' }, userData: buildGuestUserData(), isDirty: false, localUpdatedAt: null })
   },
 
   logout() {
     clearAuthLocal()
     Sentry.setUser(null)
-    set({ user: { nick: '게스트', pinHash: '' }, userData: buildDefaultUserData('게스트', ''), isDirty: false, localUpdatedAt: null })
+    set({ user: { nick: '게스트', pinHash: '' }, userData: buildGuestUserData(), isDirty: false, localUpdatedAt: null })
   },
 
   async saveUserData() {

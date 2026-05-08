@@ -118,41 +118,126 @@ export function WeeklyTasks({ deadlineItems, onToggle }: { deadlineItems: Deadli
   const today = new Date(); today.setHours(0,0,0,0)
   const weekLater = new Date(today.getTime() + 7 * 86400000)
 
-  const urgent = deadlineItems.filter(it => {
-    if (!it.deadline || it.completed) return false
+  // 이번주 항목 — 완료 여부 관계없이 마감일이 이번주 이내인 것 전부 (완료순 정렬: 미완료 먼저)
+  const thisWeek = deadlineItems.filter(it => {
+    if (!it.deadline) return false
     const d = new Date(it.deadline); d.setHours(0,0,0,0)
     return d <= weekLater
-  }).sort((a, b) => a.deadline.localeCompare(b.deadline))
+  }).sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1  // 미완료 먼저
+    return a.deadline.localeCompare(b.deadline)
+  })
 
-  if (urgent.length === 0) return null
+  // 다음 할 일 — 이번주 이후 미완료 항목 중 가장 빠른 3개
+  const upcoming = deadlineItems.filter(it => {
+    if (!it.deadline || it.completed) return false
+    const d = new Date(it.deadline); d.setHours(0,0,0,0)
+    return d > weekLater
+  }).sort((a, b) => a.deadline.localeCompare(b.deadline)).slice(0, 3)
+
+  if (thisWeek.length === 0 && upcoming.length === 0) return null
+
+  const incomplete = thisWeek.filter(it => !it.completed).length
+
+  function DayBadge({ deadline }: { deadline: string }) {
+    const d = new Date(deadline); d.setHours(0,0,0,0)
+    const diff = Math.ceil((d.getTime() - today.getTime()) / 86400000)
+    const isOverdue = diff < 0
+    return (
+      <span style={{
+        fontSize: 11, fontWeight: 700, flexShrink: 0,
+        color: isOverdue ? '#e03060' : diff === 0 ? 'var(--pk)' : '#f59e0b',
+        background: isOverdue ? '#ffe0ea' : diff === 0 ? 'var(--pk5)' : '#fef3c7',
+        borderRadius: 8, padding: '2px 8px',
+      }}>
+        {isOverdue ? `D+${Math.abs(diff)}` : diff === 0 ? 'D-DAY' : `D-${diff}`}
+      </span>
+    )
+  }
 
   return (
     <div style={{ background: '#fff', borderRadius: 14, border: '2px solid var(--pk)', marginBottom: 12, overflow: 'hidden' }}>
+      {/* ── 헤더 ── */}
       <div style={{ background: 'linear-gradient(135deg,var(--pk),var(--mn))', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 14 }}>🔔</span>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>이번주 해야 할 일</span>
-        <span style={{ background: 'rgba(255,255,255,.25)', color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{urgent.length}개</span>
+        {incomplete > 0
+          ? <span style={{ background: 'rgba(255,255,255,.25)', color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{incomplete}개 남음</span>
+          : <span style={{ background: 'rgba(255,255,255,.25)', color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>✓ 완료</span>
+        }
       </div>
-      <div style={{ padding: '8px 12px' }}>
-        {urgent.map(it => {
-          const d = new Date(it.deadline); d.setHours(0,0,0,0)
-          const today2 = new Date(); today2.setHours(0,0,0,0)
-          const diffDays = Math.ceil((d.getTime() - today2.getTime()) / 86400000)
-          const isOverdue = diffDays < 0
-          return (
-            <div key={it.itemId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid var(--gray1)' }}>
-              <input type='checkbox' checked={it.completed} onChange={() => onToggle(it.stageId, it.itemId, it.isCustom)} style={{ width: 16, height: 16, accentColor: 'var(--pk)', cursor: 'pointer', flexShrink: 0 }} />
+
+      {/* ── 이번주 항목 ── */}
+      {thisWeek.length > 0 && (
+        <div style={{ padding: '8px 12px' }}>
+          {thisWeek.map((it, idx) => (
+            <div
+              key={it.itemId}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 4px',
+                borderBottom: idx < thisWeek.length - 1 ? '1px solid var(--gray1)' : 'none',
+                opacity: it.completed ? 0.55 : 1,
+                transition: 'opacity .2s',
+              }}
+            >
+              <input
+                type='checkbox'
+                checked={it.completed}
+                onChange={() => onToggle(it.stageId, it.itemId, it.isCustom)}
+                style={{ width: 16, height: 16, accentColor: 'var(--pk)', cursor: 'pointer', flexShrink: 0 }}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+                <div style={{
+                  fontSize: 13, fontWeight: 600, color: 'var(--text)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  textDecoration: it.completed ? 'line-through' : 'none',
+                }}>
+                  {it.title}
+                </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1 }}>{it.stageName}</div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: isOverdue ? '#e03060' : diffDays === 0 ? 'var(--pk)' : '#f59e0b', background: isOverdue ? '#ffe0ea' : diffDays === 0 ? 'var(--pk5)' : '#fef3c7', borderRadius: 8, padding: '2px 8px' }}>
-                {isOverdue ? `D+${Math.abs(diffDays)}` : diffDays === 0 ? 'D-DAY' : `D-${diffDays}`}
-              </span>
+              {it.completed
+                ? <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gr,#06d6a0)', background: '#e8fdf5', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>완료</span>
+                : <DayBadge deadline={it.deadline} />
+              }
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── 다음 할 일 ── */}
+      {upcoming.length > 0 && (
+        <>
+          <div style={{ padding: '6px 16px', background: 'var(--gray1)', fontSize: 10, fontWeight: 700, color: 'var(--text2)', letterSpacing: '0.05em' }}>
+            다음 할 일
+          </div>
+          <div style={{ padding: '6px 12px 10px' }}>
+            {upcoming.map((it, idx) => (
+              <div
+                key={it.itemId}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '6px 4px',
+                  borderBottom: idx < upcoming.length - 1 ? '1px solid var(--gray1)' : 'none',
+                }}
+              >
+                <input
+                  type='checkbox'
+                  checked={it.completed}
+                  onChange={() => onToggle(it.stageId, it.itemId, it.isCustom)}
+                  style={{ width: 15, height: 15, accentColor: 'var(--pk)', cursor: 'pointer', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--gray3)', marginTop: 1 }}>{it.stageName}</div>
+                </div>
+                <DayBadge deadline={it.deadline} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

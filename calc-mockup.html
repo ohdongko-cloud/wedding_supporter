@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>계산기 UI 개선 목업</title>
+<style>
+:root{--pk:#ff6b9d;--pk2:#ff8fab;--pk3:#ffb3c6;--pk4:#ffd6e0;--pk5:#fff0f3;--mn:#c77dff;--gr:#06d6a0;--bl:#4cc9f0;--or:#ff9a3c;--bg:#fff5f7;--gray1:#fef0f3;--gray2:#f5d5de;--gray3:#c9a0ac;--text:#3d1a24;--text2:#7a4a57}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Malgun Gothic',-apple-system,sans-serif;background:#e8e8e8;color:var(--text);font-size:14px;padding:16px 12px 40px}
+h1{text-align:center;font-size:15px;font-weight:900;color:var(--text);padding:4px 0 2px}
+h2{text-align:center;font-size:11px;color:#999;padding:2px 0 14px}
+.wrap{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;max-width:780px;margin:0 auto}
+.col{width:340px;flex-shrink:0}
+.col-lbl{text-align:center;font-size:11px;font-weight:800;color:#888;padding:0 0 7px;letter-spacing:1px}
+.phone{background:var(--bg);border-radius:20px;overflow:hidden;box-shadow:0 10px 36px rgba(0,0,0,.16)}
+.ph{background:linear-gradient(135deg,var(--pk),var(--mn));padding:11px 14px;display:flex;align-items:center;justify-content:space-between}
+.ph span{color:#fff;font-weight:800;font-size:14px}
+.ph small{color:rgba(255,255,255,.8);font-size:11px}
+.pb{padding:12px 12px 60px;max-height:760px;overflow-y:auto}
+
+/* ── 공통 탭바 ── */
+.tabs{display:flex;gap:5px;background:#fff;border-radius:12px;padding:5px;border:1.5px solid var(--pk4);margin-bottom:12px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border:none;border-radius:9px;cursor:pointer;background:transparent;font-size:10px;font-weight:700;color:var(--gray3)}
+.tab.active{background:linear-gradient(135deg,var(--pk),var(--mn));color:#fff}
+.tab-ico{font-size:14px}
+
+/* ── OLD top area ── */
+.old-budget{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.old-budget input{flex:1;border:1.5px solid var(--pk4);border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:var(--text2)}
+.old-budget small{font-size:12px;color:var(--text2);white-space:nowrap}
+.old-budget button{background:var(--pk);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer}
+.old-actions{display:flex;gap:6px;margin-bottom:12px}
+.old-btn{flex:1;border:1.5px solid var(--pk4);border-radius:10px;padding:9px;font-size:11px;font-weight:700;background:#fff;cursor:pointer;color:var(--text)}
+.old-section{background:#fff;border:1.5px solid var(--pk4);border-radius:12px;padding:14px;margin-bottom:10px}
+.old-section-title{font-size:13px;font-weight:800;margin-bottom:12px}
+.old-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--text)}
+.old-row label{min-width:64px;color:var(--text2);font-size:11px}
+.old-input{flex:1;border:1px solid var(--gray2);border-radius:7px;padding:6px 8px;font-size:12px;background:#fff;color:var(--text)}
+.old-select{flex:1;border:1px solid var(--gray2);border-radius:7px;padding:6px 8px;font-size:11px;background:#fff;color:var(--text);max-width:180px}
+.old-subtotal{font-size:11px;color:var(--pk);font-weight:700;margin-top:4px}
+.old-cat{background:#fff;border:1.5px solid var(--pk4);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.old-cat-hd{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer}
+.old-cat-title{font-size:13px;font-weight:800}
+.old-cat-total{font-size:11px;color:var(--pk);font-weight:700}
+.old-item{display:flex;align-items:center;gap:7px;padding:7px 14px;border-top:1px solid var(--gray1);font-size:11px}
+.old-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--pk);flex-shrink:0}
+.old-star{font-size:10px;color:var(--gray3);flex-shrink:0}
+.old-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.old-item-date{font-size:10px;color:var(--gray3);white-space:nowrap;flex-shrink:0}
+.old-item-info{background:none;border:none;cursor:pointer;font-size:12px;color:#4a80ee;flex-shrink:0;padding:1px 2px}
+.old-item-price{min-width:36px;text-align:right;font-size:11px;font-weight:700;flex-shrink:0}
+.old-item-x{background:none;border:none;cursor:pointer;font-size:11px;color:var(--pk3);flex-shrink:0;padding:1px}
+
+/* ── NEW top card ── */
+.new-hero{background:linear-gradient(135deg,var(--pk),var(--mn));border-radius:14px;padding:16px;margin-bottom:12px;color:#fff}
+.new-hero-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.new-hero-left{}
+.new-hero-label{font-size:10px;opacity:.8;margin-bottom:2px;font-weight:600}
+.new-hero-total{font-size:30px;font-weight:900;line-height:1}
+.new-hero-budget{font-size:11px;opacity:.8;margin-top:4px}
+.new-hero-right{text-align:right}
+.new-hero-rem{font-size:10px;opacity:.8;margin-bottom:2px}
+.new-hero-remval{font-size:18px;font-weight:800}
+.new-hero-bar{height:6px;background:rgba(255,255,255,.25);border-radius:3px;margin-bottom:10px}
+.new-hero-fill{height:100%;background:#fff;border-radius:3px}
+.new-hero-cats{display:flex;gap:6px}
+.new-hero-cat{flex:1;background:rgba(255,255,255,.15);border-radius:8px;padding:6px 4px;text-align:center}
+.new-hero-cat-name{font-size:9px;opacity:.8}
+.new-hero-cat-val{font-size:12px;font-weight:800;margin-top:2px}
+/* budget edit row */
+.new-budget-row{display:flex;gap:6px;align-items:center;margin-top:10px;background:rgba(255,255,255,.15);border-radius:9px;padding:7px 10px}
+.new-budget-row span{font-size:10px;opacity:.85;white-space:nowrap}
+.new-budget-input{flex:1;border:none;background:transparent;color:#fff;font-size:13px;font-weight:700;outline:none;text-align:right;min-width:0}
+.new-budget-input::placeholder{color:rgba(255,255,255,.5)}
+.new-budget-save{background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+
+/* ── NEW 식사/대관료 카드 ── */
+.new-venue-card{background:#fff;border:1.5px solid var(--pk4);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.new-venue-hd{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--pk5);cursor:pointer}
+.new-venue-hd-title{font-size:12px;font-weight:800;color:var(--text)}
+.new-venue-hd-total{font-size:13px;font-weight:900;color:var(--pk)}
+.new-venue-body{padding:12px 14px}
+.nv-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.nv-row:last-child{margin-bottom:0}
+.nv-label{font-size:11px;color:var(--text2);min-width:62px;flex-shrink:0}
+.nv-input{flex:1;border:1.5px solid var(--pk4);border-radius:7px;padding:6px 9px;font-size:12px;background:var(--pk5);color:var(--text);outline:none}
+.nv-unit{font-size:11px;color:var(--text2);flex-shrink:0}
+.nv-select{flex:1;border:1.5px solid var(--pk4);border-radius:7px;padding:6px 9px;font-size:11px;background:var(--pk5);color:var(--text);outline:none}
+.nv-sub{font-size:11px;color:var(--pk);font-weight:700;text-align:right;padding-top:6px;border-top:1px solid var(--pk4);margin-top:6px}
+
+/* ── NEW 카테고리 카드 ── */
+.new-cat{background:#fff;border:1.5px solid var(--pk4);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.new-cat-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer}
+.new-cat-hd-left{display:flex;align-items:center;gap:7px}
+.new-cat-hd-name{font-size:13px;font-weight:800}
+.new-cat-hd-badge{background:var(--pk5);color:var(--pk);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700}
+.new-cat-hd-right{display:flex;align-items:center;gap:6px}
+.new-cat-hd-total{font-size:12px;font-weight:800;color:var(--pk)}
+.new-cat-prog{height:3px;background:var(--pk4);margin:0 14px 10px;border-radius:2px}
+.new-cat-pfill{height:100%;background:linear-gradient(90deg,var(--pk),var(--mn));border-radius:2px}
+
+/* NEW item row */
+.new-item{border-top:1px solid var(--gray1);padding:8px 14px;display:flex;align-items:center;gap:9px}
+.new-item-chk{width:18px;height:18px;border-radius:4px;border:2px solid var(--pk3);background:#fff;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.new-item-chk.on{background:var(--pk);border-color:var(--pk)}
+.new-item-chk .cm{color:#fff;font-size:10px;font-weight:900;line-height:1}
+.new-item-name{flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.new-item-name.done{text-decoration:line-through;color:var(--gray3)}
+.new-item-price-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.new-item-price-input{width:44px;border:1.5px solid var(--pk4);border-radius:6px;padding:3px 5px;font-size:11px;font-weight:700;text-align:right;background:var(--pk5);color:var(--pk);outline:none}
+.new-item-unit{font-size:10px;color:var(--text2)}
+.new-item-info{background:none;border:none;cursor:pointer;font-size:14px;color:var(--pk3);flex-shrink:0;padding:0 0 0 1px;line-height:1}
+
+/* 개선 포인트 카드 */
+.notes{background:#fff;border-radius:12px;border:1.5px solid var(--pk4);padding:14px;margin-top:8px}
+.note-title{font-size:12px;font-weight:800;margin-bottom:9px;color:var(--text)}
+.note-item{font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:5px;display:flex;gap:4px}
+.note-item strong{color:var(--text)}
+</style>
+</head>
+<body>
+<h1>계산기 UI 개선 제안</h1>
+<h2>좌: 현재 / 우: 개선안 (결혼비용 탭 기준, 신혼집·신혼여행도 동일 구조 적용)</h2>
+
+<div class="wrap">
+
+<!-- ════════ BEFORE ════════ -->
+<div class="col">
+<div class="col-lbl">⬅ 현재</div>
+<div class="phone">
+  <div class="ph"><span>계산기</span><small>게스트</small></div>
+  <div class="pb">
+
+    <!-- 탭 -->
+    <div class="tabs">
+      <button class="tab active"><span class="tab-ico">💍</span>결혼비용</button>
+      <button class="tab"><span class="tab-ico">🏠</span>신혼집</button>
+      <button class="tab"><span class="tab-ico">✈️</span>신혼여행</button>
+    </div>
+
+    <!-- 예산 입력 (평범한 input+버튼) -->
+    <div class="old-budget">
+      <input placeholder="예산 입력" readonly style="width:100%;border:1.5px solid var(--pk4);border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:var(--text2)"/>
+      <small>만원</small>
+      <button style="background:var(--pk);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">저장</button>
+    </div>
+
+    <!-- 액션 버튼 -->
+    <div class="old-actions">
+      <button class="old-btn">🎁 엑셀로 다운받기</button>
+      <button class="old-btn">💒 스타일 변경</button>
+    </div>
+
+    <!-- 식사 및 대관료 (독립 섹션, 다른 섹션들과 다른 스타일) -->
+    <div class="old-section">
+      <div class="old-section-title">식사 및 대관료</div>
+      <div class="old-row"><label>하객 인원</label><input class="old-input" value="200" style="width:60px" readonly/><span style="font-size:11px;color:var(--text2)">명</span></div>
+      <div class="old-row"><label>1인 식대</label><select class="old-select"><option>7.7만원/인</option></select></div>
+      <div class="old-row"><label>예식장</label><select class="old-select"><option>예식장 선택 (선택사항)</option></select></div>
+      <div class="old-row"><label>대관료</label><input class="old-input" value="450" style="width:70px" readonly/><span style="font-size:11px;color:var(--text2)">만원</span></div>
+      <div class="old-subtotal">소계: 1,990만원 (식대 1,540만원 + 대관료 450만원)</div>
+    </div>
+
+    <!-- 카테고리: 결혼식장 -->
+    <div class="old-cat">
+      <div class="old-cat-hd">
+        <span class="old-cat-title">결혼식장</span>
+        <span style="display:flex;align-items:center;gap:6px"><span class="old-cat-total">25만원</span><span style="font-size:10px;color:var(--text2)">▲</span></span>
+      </div>
+      <div class="old-item"><input type="checkbox"/><span class="old-star">☆</span><span class="old-item-name">생화 꽃장식 (D-4개월~)</span><button class="old-item-info">i</button><span class="old-item-price">130</span><span style="font-size:10px;color:var(--text2)">만원</span><button class="old-item-x">✕</button></div>
+      <div class="old-item"><input type="checkbox" checked style="accent-color:var(--pk)"/><span class="old-star" style="color:var(--or)">★</span><span class="old-item-name">부케 (D-4개월~)</span><button class="old-item-info">i</button><span class="old-item-price" style="color:var(--pk)">25</span><span style="font-size:10px;color:var(--text2)">만원</span><button class="old-item-x">✕</button></div>
+      <div class="old-item"><input type="checkbox"/><span class="old-star">☆</span><span class="old-item-name">코사지 (D-4개월~)</span><button class="old-item-info">i</button><span class="old-item-price">10</span><span style="font-size:10px;color:var(--text2)">만원</span><button class="old-item-x">✕</button></div>
+      <div class="old-item"><input type="checkbox"/><span class="old-star">☆</span><span class="old-item-name">부토니에 (D-4개월~)</span><button class="old-item-info">i</button><span class="old-item-price">10</span><span style="font-size:10px;color:var(--text2)">만원</span><button class="old-item-x">✕</button></div>
+      <div class="old-item"><input type="checkbox"/><span class="old-star">☆</span><span class="old-item-name">폐백 음식 (D-4개월~)</span><button class="old-item-info">i</button><span class="old-item-price">28</span><span style="font-size:10px;color:var(--text2)">만원</span><button class="old-item-x">✕</button></div>
+      <div class="old-item"><input type="checkbox"/><span class="old-star">☆</span><span class="old-item-name">폐백 수모 (D-2개월~)</span><button class="old-item-info">i</button><span class="old-item-price">13</span><span style="font-size:10px;color:var(--text2)">만원</span><button class="old-item-x">✕</button></div>
+      <div class="old-item"><input type="checkbox"/><span class="old-star">☆</span><span class="old-item-name">한복 대여 (D-4개월~)</span><button class="old-item-info">i</button><span class="old-item-price">27</span><span style="font-size:10px;color:var(--text2)">만원</span><button class="old-item-x">✕</button></div>
+    </div>
+
+    <!-- 카테고리: 스드메 (접힌 상태) -->
+    <div class="old-cat">
+      <div class="old-cat-hd">
+        <span class="old-cat-title">스드메</span>
+        <span style="display:flex;align-items:center;gap:6px"><span class="old-cat-total">400만원</span><span style="font-size:10px;color:var(--text2)">▼</span></span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ════════ AFTER ════════ -->
+<div class="col">
+<div class="col-lbl">개선안 ➡</div>
+<div class="phone">
+  <div class="ph"><span>계산기</span><small>게스트</small></div>
+  <div class="pb">
+
+    <!-- 탭 (동일 유지) -->
+    <div class="tabs">
+      <button class="tab active"><span class="tab-ico">💍</span>결혼비용</button>
+      <button class="tab"><span class="tab-ico">🏠</span>신혼집</button>
+      <button class="tab"><span class="tab-ico">✈️</span>신혼여행</button>
+    </div>
+
+    <!-- ★ NEW: 통합 상단 히어로 카드 (3개 탭 모두 동일 구조) -->
+    <div class="new-hero">
+      <div class="new-hero-top">
+        <div class="new-hero-left">
+          <div class="new-hero-label">💍 결혼비용 예상 합계</div>
+          <div class="new-hero-total">3,415만원</div>
+          <div class="new-hero-budget">목표 예산 5,000만원 기준</div>
+        </div>
+        <div class="new-hero-right">
+          <div class="new-hero-rem">예산 잔여</div>
+          <div class="new-hero-remval" style="color:#a8ffdf">1,585만원</div>
+        </div>
+      </div>
+      <!-- 예산 사용률 바 -->
+      <div class="new-hero-bar"><div class="new-hero-fill" style="width:68%"></div></div>
+      <!-- 카테고리별 세부 합계 -->
+      <div class="new-hero-cats">
+        <div class="new-hero-cat"><div class="new-hero-cat-name">식사·대관료</div><div class="new-hero-cat-val">1,990만</div></div>
+        <div class="new-hero-cat"><div class="new-hero-cat-name">스드메</div><div class="new-hero-cat-val">400만</div></div>
+        <div class="new-hero-cat"><div class="new-hero-cat-name">식장 데코</div><div class="new-hero-cat-val">25만</div></div>
+        <div class="new-hero-cat"><div class="new-hero-cat-name">기타</div><div class="new-hero-cat-val">1,000만</div></div>
+      </div>
+      <!-- 예산 입력 인라인 -->
+      <div class="new-budget-row">
+        <span>목표 예산</span>
+        <input class="new-budget-input" value="5,000" readonly/>
+        <span style="font-size:10px;color:rgba(255,255,255,.7);margin-right:2px">만원</span>
+        <button class="new-budget-save">저장</button>
+      </div>
+    </div>
+
+    <!-- ★ 액션 버튼: 엑셀·스타일변경을 아이콘+작은텍스트로 우측 정렬 -->
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:12px">
+      <button style="background:#fff;border:1.5px solid var(--pk4);color:var(--text2);border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px">🎁 엑셀</button>
+      <button style="background:#fff;border:1.5px solid var(--pk4);color:var(--text2);border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px">💒 스타일</button>
+    </div>
+
+    <!-- ★ 식사·대관료: 카테고리 카드와 동일한 구조 -->
+    <div class="new-venue-card">
+      <div class="new-venue-hd">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="font-size:14px">🍽️</span>
+          <span class="new-venue-hd-title">식사 및 대관료</span>
+        </div>
+        <span class="new-venue-hd-total">1,990만원</span>
+      </div>
+      <div class="new-venue-body">
+        <div class="nv-row"><span class="nv-label">하객 인원</span><input class="nv-input" value="200" style="width:60px;flex:none" readonly/><span class="nv-unit">명</span></div>
+        <div class="nv-row"><span class="nv-label">1인 식대</span><select class="nv-select"><option>7.7만원/인 (전국 평균)</option></select></div>
+        <div class="nv-row"><span class="nv-label">예식장</span><select class="nv-select"><option>예식장 선택 (선택사항)</option></select></div>
+        <div class="nv-row"><span class="nv-label">대관료</span><input class="nv-input" value="450" style="width:60px;flex:none" readonly/><span class="nv-unit">만원</span></div>
+        <div class="nv-sub">식대 1,540만원 + 대관료 450만원 = 1,990만원</div>
+      </div>
+    </div>
+
+    <!-- ★ 카테고리: 결혼식장 — 간결한 아이템 행, D-day 제거, 가격 인풋 강조 -->
+    <div class="new-cat">
+      <div class="new-cat-hd">
+        <div class="new-cat-hd-left">
+          <span style="font-size:14px">💐</span>
+          <span class="new-cat-hd-name">결혼식장 데코</span>
+          <span class="new-cat-hd-badge">1/7</span>
+        </div>
+        <div class="new-cat-hd-right">
+          <span class="new-cat-hd-total">25만원</span>
+          <span style="font-size:10px;color:var(--text2)">▲</span>
+        </div>
+      </div>
+      <!-- 스테이지 진행 바 -->
+      <div class="new-cat-prog"><div class="new-cat-pfill" style="width:14%"></div></div>
+
+      <!-- 아이템 행: 체크박스 + 이름 + 금액입력 + ⓘ -->
+      <div class="new-item">
+        <div class="new-item-chk"></div>
+        <span class="new-item-name">생화 꽃장식</span>
+        <div class="new-item-price-wrap"><input class="new-item-price-input" value="130" readonly/><span class="new-item-unit">만원</span></div>
+        <button class="new-item-info">ⓘ</button>
+      </div>
+      <div class="new-item">
+        <div class="new-item-chk on"><span class="cm">✓</span></div>
+        <span class="new-item-name" style="color:var(--pk);font-weight:700">부케</span>
+        <div class="new-item-price-wrap"><input class="new-item-price-input" value="25" readonly/><span class="new-item-unit">만원</span></div>
+        <button class="new-item-info">ⓘ</button>
+      </div>
+      <div class="new-item">
+        <div class="new-item-chk"></div>
+        <span class="new-item-name">코사지</span>
+        <div class="new-item-price-wrap"><input class="new-item-price-input" value="10" readonly/><span class="new-item-unit">만원</span></div>
+        <button class="new-item-info">ⓘ</button>
+      </div>
+      <div class="new-item">
+        <div class="new-item-chk"></div>
+        <span class="new-item-name">부토니에</span>
+        <div class="new-item-price-wrap"><input class="new-item-price-input" value="10" readonly/><span class="new-item-unit">만원</span></div>
+        <button class="new-item-info">ⓘ</button>
+      </div>
+      <div class="new-item">
+        <div class="new-item-chk"></div>
+        <span class="new-item-name">폐백 음식</span>
+        <div class="new-item-price-wrap"><input class="new-item-price-input" value="28" readonly/><span class="new-item-unit">만원</span></div>
+        <button class="new-item-info">ⓘ</button>
+      </div>
+    </div>
+
+    <!-- 카테고리: 스드메 (접힘) -->
+    <div class="new-cat">
+      <div class="new-cat-hd">
+        <div class="new-cat-hd-left">
+          <span style="font-size:14px">💄</span>
+          <span class="new-cat-hd-name">스드메</span>
+          <span class="new-cat-hd-badge">3/3</span>
+        </div>
+        <div class="new-cat-hd-right">
+          <span class="new-cat-hd-total">400만원</span>
+          <span style="font-size:10px;color:var(--text2)">▼</span>
+        </div>
+      </div>
+      <div class="new-cat-prog" style="margin-bottom:10px"><div class="new-cat-pfill" style="width:100%"></div></div>
+    </div>
+
+    <!-- 개선 포인트 설명 -->
+    <div class="notes">
+      <div class="note-title">✨ 개선 포인트 요약</div>
+      <div class="note-item">① <strong>통합 히어로 카드</strong> — 3개 탭 모두 동일 상단 구조: 예상 합계·예산·잔여·카테고리 세부 한 눈에</div>
+      <div class="note-item">② <strong>예산 입력 카드 내 통합</strong> — 예산 입력·저장 버튼을 히어로 카드 안에 배치, 상단 별도 행 제거</div>
+      <div class="note-item">③ <strong>식사/대관료 통일</strong> — 독립된 다른 스타일 섹션 → 카테고리 카드와 동일한 헤더+아이콘 구조</div>
+      <div class="note-item">④ <strong>아이템 행 간소화</strong> — D-day 준비시기 텍스트 제거 (ⓘ로 이동), ☆/★ 제거, 금액 인풋을 핑크 칩으로 강조</div>
+      <div class="note-item">⑤ <strong>카테고리별 진행 바</strong> — 선택 완료 비율 한 눈에 확인</div>
+      <div class="note-item">⑥ <strong>엑셀·스타일 버튼 축소</strong> — 작은 아이콘 버튼으로 우측 정렬, 공간 확보</div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

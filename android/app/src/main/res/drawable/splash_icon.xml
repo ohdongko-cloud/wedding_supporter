@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 결혼딸깍 — 다이아몬드 반지 벡터 아이콘 (스플래시용) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- 배경 원 (반투명 흰색) -->
+    <path
+        android:pathData="M60,4 A56,56 0 1,1 59.99,4 Z"
+        android:fillColor="#26FFFFFF" />
+
+    <!-- 반지 밴드 상단 호 -->
+    <path
+        android:pathData="M38,68 Q60,80 82,68"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 반지 밴드 왼쪽 -->
+    <path
+        android:pathData="M38,68 Q35,80 42,90"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 반지 밴드 오른쪽 -->
+    <path
+        android:pathData="M82,68 Q85,80 78,90"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 반지 밴드 하단 -->
+    <path
+        android:pathData="M42,90 Q60,98 78,90"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 다이아몬드 외곽 -->
+    <path
+        android:pathData="M60,26 L80,44 L72,64 L48,64 L40,44 Z"
+        android:fillColor="#F2FFFFFF"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5" />
+
+    <!-- 다이아몬드 상단 facet -->
+    <path
+        android:pathData="M60,26 L80,44 L60,40 L40,44 Z"
+        android:fillColor="#99FFFFFF" />
+
+    <!-- 다이아몬드 중앙 facet -->
+    <path
+        android:pathData="M60,40 L80,44 L72,64 L48,64 L40,44 Z"
+        android:fillColor="#40FFFFFF" />
+
+    <!-- 반짝임 포인트 -->
+    <path
+        android:pathData="M60,30 L65,40 L60,43 L55,40 Z"
+        android:fillColor="#CCFFFFFF" />
+
+    <!-- 별 반짝이 (우상단) -->
+    <path
+        android:pathData="M90,30 L90,38"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M86,34 L94,34"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 별 반짝이 (좌중단) -->
+    <path
+        android:pathData="M28,48 L28,54"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M25,51 L31,51"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 작은 원 반짝이 -->
+    <path
+        android:pathData="M87,72 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#B3FFFFFF" />
+
+</vector>

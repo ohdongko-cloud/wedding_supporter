@@ -183,7 +183,7 @@ export default function SettingsPage() {
 
       {/* ── 앱 정보 ── */}
       <Section title="앱 정보">
-        <Row icon={<InfoIcon />} label="버전" sub="v1.1.0" last />
+        <Row icon={<InfoIcon />} label="버전" sub="v1.2.0" last />
       </Section>
 
       {/* ── 계정 ── */}
