@@ -23,10 +23,10 @@ Sentry.init({
 
 document.addEventListener('contextmenu', e => e.preventDefault())
 
-// Kakao SDK 초기화 (VITE_KAKAO_APP_KEY 환경변수 필요)
+// Kakao SDK 초기화 — env var 우선, 없으면 하드코딩 키 폴백
 declare global { interface Window { Kakao: any } }
-const kakaoKey = import.meta.env.VITE_KAKAO_APP_KEY as string | undefined
-if (kakaoKey && window.Kakao) {
+const kakaoKey = (import.meta.env.VITE_KAKAO_APP_KEY as string | undefined) ?? 'fb3e1e08818730f702f1d031bd760f74'
+if (window.Kakao) {
   try {
     if (!window.Kakao.isInitialized()) {
       window.Kakao.init(kakaoKey)

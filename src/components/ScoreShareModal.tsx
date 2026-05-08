@@ -246,8 +246,9 @@ export default function ScoreShareModal({
   function shareKakao() {
     if (isGuest) { onGuestBlock(); return }
     const kakao = window.Kakao
-    const key = (import.meta.env.VITE_KAKAO_APP_KEY as string | undefined)
-    if (kakao && key) {
+    // env var 우선, 없으면 하드코딩 키 폴백 (앱/웹 모두 동작)
+    const key = (import.meta.env.VITE_KAKAO_APP_KEY as string | undefined) ?? 'fb3e1e08818730f702f1d031bd760f74'
+    if (kakao) {
       try { if (!kakao.isInitialized()) kakao.init(key) } catch { /* ignore */ }
     }
     if (kakao && kakao.isInitialized?.()) {

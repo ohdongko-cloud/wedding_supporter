@@ -27,9 +27,10 @@ export default function ShareModal({ shareUrl, onClose }: Props) {
 
   function shareKakao() {
     const kakao = window.Kakao
-    const key = (import.meta.env.VITE_KAKAO_APP_KEY as string | undefined)
+    // env var 우선, 없으면 하드코딩 키 폴백 (앱/웹 모두 동작)
+    const key = (import.meta.env.VITE_KAKAO_APP_KEY as string | undefined) ?? 'fb3e1e08818730f702f1d031bd760f74'
     // lazy init: SDK가 로드됐지만 아직 초기화 안 된 경우 재시도
-    if (kakao && key) {
+    if (kakao) {
       try { if (!kakao.isInitialized()) kakao.init(key) } catch { /* ignore */ }
     }
     if (kakao && kakao.isInitialized?.()) {
