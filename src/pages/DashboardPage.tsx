@@ -191,7 +191,7 @@ export default function DashboardPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
-  // ── 딸깍 스코어 계산 ──
+  // ── 결혼 준비 스코어 계산 ──
   const score = calcDdalkakScore({ checklistPct: pct, urgentCount, userData })
   const yesterdayScore = getYesterdayScore()
   useEffect(() => { saveScoreCache(score) }, [score]) // eslint-disable-line
@@ -359,7 +359,7 @@ export default function DashboardPage() {
       })()}
 
       {/* ══════════════════════════════════════
-          2. 딸깍 스코어 카드
+          2. 결혼 준비 스코어 카드
       ══════════════════════════════════════ */}
       <ScoreCard
         score={score}

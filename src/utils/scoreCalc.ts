@@ -33,7 +33,7 @@ export function calcTimelineScore(urgentCount: number): number {
   return Math.max(0, 100 - urgentCount * 25)
 }
 
-// ── 4. 종합 딸깍 스코어 (0~100) ──────────────────────────────────
+// ── 4. 종합 결혼 준비 스코어 (0~100) ─────────────────────────────
 export function calcDdalkakScore(params: {
   checklistPct: number
   urgentCount: number

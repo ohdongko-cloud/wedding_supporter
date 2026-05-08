@@ -60,7 +60,7 @@ export default function ScoreCard({
     }}>
       {/* ── 헤더 ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>📊 딸깍 스코어</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>📊 결혼 준비 스코어</span>
         {showDelta && (
           <span style={{
             fontSize: 11, fontWeight: 700, borderRadius: 20,

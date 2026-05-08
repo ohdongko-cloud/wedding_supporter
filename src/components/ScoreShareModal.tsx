@@ -255,7 +255,7 @@ export default function ScoreShareModal({
       kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: `딸깍 스코어 ${score}점 💍`,
+          title: `결혼 준비 스코어 ${score}점 💍`,
           description: `${labelEmoji} ${label}\n결혼딸깍으로 함께 준비 중이에요!`,
           imageUrl: `${PROD_ORIGIN}/og-image.png`,
           link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
@@ -323,7 +323,7 @@ export default function ScoreShareModal({
         <div style={{ width: 40, height: 4, background: '#e0e0e0', borderRadius: 2, margin: '0 auto 16px' }} />
 
         <div style={{ fontSize: 16, fontWeight: 800, textAlign: 'center', marginBottom: 14 }}>
-          📊 딸깍 스코어 공유
+          📊 결혼 준비 스코어 공유
         </div>
 
         {/* 카드 미리보기 */}
@@ -341,7 +341,7 @@ export default function ScoreShareModal({
           ) : imageUrl ? (
             <img
               src={imageUrl}
-              alt="딸깍 스코어 카드"
+              alt="결혼 준비 스코어 카드"
               style={{ width: '100%', height: 'auto', display: 'block' }}
             />
           ) : null}
