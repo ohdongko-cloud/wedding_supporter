@@ -8,6 +8,9 @@ import type { DeadlineItem } from '../components/ChecklistWidgets'
 import type { CalcState, Post } from '../types'
 import OnboardingWizard, { type OnboardingResult } from '../components/OnboardingWizard'
 import { ChecklistIcon, RingIcon, PlaneIcon, HouseHeartIcon } from '../components/icons/AppIcons'
+import ScoreCard from '../components/ScoreCard'
+import ScoreShareModal from '../components/ScoreShareModal'
+import { calcDdalkakScore, calcAreaScore, getYesterdayScore, saveScoreCache } from '../utils/scoreCalc'
 
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
 
@@ -56,6 +59,7 @@ export default function DashboardPage() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([])
   const [postsLoading, setPostsLoading] = useState(true)
   const [postsError, setPostsError] = useState(false)
+  const [scoreShareOpen, setScoreShareOpen] = useState(false)
   const showOnboarding = !isGuest && userData.hasSeenOnboarding === false
 
   async function fetchPosts() {
@@ -187,6 +191,11 @@ export default function DashboardPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  // ── 딸깍 스코어 계산 ──
+  const score = calcDdalkakScore({ checklistPct: pct, urgentCount, userData })
+  const yesterdayScore = getYesterdayScore()
+  useEffect(() => { saveScoreCache(score) }, [score]) // eslint-disable-line
+
   // ── 세그먼트 바 너비 계산 ──
   function segWidth(cost: number) {
     if (budget <= 0 || totalCost <= 0) return 0
@@ -201,6 +210,19 @@ export default function DashboardPage() {
     <div>
       {guestPopup && <GuestPopup onClose={() => setGuestPopup(false)} />}
       {showOnboarding && <OnboardingWizard nick={userData.nick} onComplete={completeOnboarding} />}
+      {scoreShareOpen && (
+        <ScoreShareModal
+          score={score}
+          weddingAreaPct={calcAreaScore(userData.calcWedding)}
+          houseAreaPct={calcAreaScore(userData.calcHouse)}
+          honeymoonAreaPct={calcAreaScore(userData.calcHoneymoon)}
+          dday={dday}
+          totalCost={totalCost}
+          isGuest={isGuest}
+          onClose={() => setScoreShareOpen(false)}
+          onGuestBlock={() => { setScoreShareOpen(false); setGuestPopup(true) }}
+        />
+      )}
 
       {/* ══════════════════════════════════════
           1. 히어로 카드 (개인화·설렘 중심)
@@ -335,6 +357,18 @@ export default function DashboardPage() {
           </div>
         )
       })()}
+
+      {/* ══════════════════════════════════════
+          2. 딸깍 스코어 카드
+      ══════════════════════════════════════ */}
+      <ScoreCard
+        score={score}
+        yesterdayScore={yesterdayScore}
+        weddingAreaPct={calcAreaScore(userData.calcWedding)}
+        houseAreaPct={calcAreaScore(userData.calcHouse)}
+        honeymoonAreaPct={calcAreaScore(userData.calcHoneymoon)}
+        onShareClick={() => setScoreShareOpen(true)}
+      />
 
       {/* ══════════════════════════════════════
           2-B. 신혼여행·신혼집 상태 카드 (NEW)
